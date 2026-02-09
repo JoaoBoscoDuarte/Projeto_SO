@@ -8,7 +8,8 @@ Projeto da disciplina de Sistemas Operacionais do curso de Ciência da Computaç
 2. [Dependências](#dependências)
 3. [Compilação e Execução](#compilação-e-execução)
 4. [Documentação](#documentação)
-5. [Contribuidores](#contribuidores)
+5. [Referências](#referências)
+6. [Contribuidores](#contribuidores)
 
 ## Sobre o Projeto
 
@@ -55,49 +56,52 @@ Além do código fonte, a pasta `docs/` contém documentos em Markdown com:
 - Conceitos fundamentais de sistemas operacionais
 - Guias de desenvolvimento
 
+## Referências
+
+- Helin, E., & Renberg, A. **The Little Book About OS Development**. Disponível em: [https://littleosbook.github.io/](https://littleosbook.github.io/)
+- [OSDev Wiki](https://wiki.osdev.org/) - Recursos sobre desenvolvimento de sistemas operacionais
+- [Intel® 64 and IA-32 Architectures Software Developer Manuals](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html)
+
 ## Contribuidores
 
 <table>
   <tr>
     <td align="center">
       <a href="https://github.com/JoaoBoscoDuarte">
-        <img src="https://github.com/JoaoBoscoDuarte.png" width="100px;" alt="João Bosco Duarte"/><br />
-        <sub><b>João Bosco Duarte</b></sub>
-      </a><br />
-      <details>
-        <summary>Contribuições</summary>
-        <i>Adicione aqui as contribuições</i>
-      </details>
+        <img src="https://github.com/JoaoBoscoDuarte.png" width="100"/><br>
+        <b>João Bosco Duarte</b>
+      </a>
+      <p>
+        • Primeiros Passos<br>
+        • Boot do Sistema Operacional
+      </p>
     </td>
     <td align="center">
       <a href="https://github.com/guilopeszw">
-        <img src="https://github.com/guilopeszw.png" width="100px;" alt="Guilherme Lopes"/><br />
-        <sub><b>Guilherme Lopes</b></sub>
-      </a><br />
-      <details>
-        <summary>Contribuições</summary>
-        <i>Adicione aqui as contribuições</i>
-      </details>
+        <img src="https://github.com/guilopeszw.png" width="100"/><br>
+        <b>Guilherme Lopes</b>
+      </a>
+      <p>
+      - 
+      </p>
     </td>
     <td align="center">
       <a href="https://github.com/Marcus-Vin">
-        <img src="https://github.com/Marcus-Vin.png" width="100px;" alt="Marcus Vinícius"/><br />
-        <sub><b>Marcus Vinícius</b></sub>
-      </a><br />
-      <details>
-        <summary>Contribuições</summary>
-        <i>Adicione aqui as contribuições</i>
-      </details>
+        <img src="https://github.com/Marcus-Vin.png" width="100"/><br>
+        <b>Marcus Vinícius</b>
+      </a>
+      <p>
+        -
+      </p>
     </td>
     <td align="center">
       <a href="https://github.com/SamSantosidc">
-        <img src="https://github.com/SamSantosidc.png" width="100px;" alt="Samuel Santos"/><br />
-        <sub><b>Samuel Santos</b></sub>
-      </a><br />
-      <details>
-        <summary>Contribuições</summary>
-        <i>Adicione aqui as contribuições</i>
-      </details>
+        <img src="https://github.com/SamSantosidc.png" width="100"/><br>
+        <b>Samuel Santos</b>
+      </a>
+      <p>
+      -
+      </p>
     </td>
   </tr>
 </table>
