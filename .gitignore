@@ -1,6 +1,6 @@
 # Build artifacts
-*.o
 *.elf
+*.o
 *.iso
 
 # Logs 
