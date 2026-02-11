@@ -72,8 +72,7 @@ Além do código fonte, a pasta `docs/` contém documentos em Markdown com:
         <b>João Bosco Duarte</b>
       </a>
       <p>
-        • Primeiros Passos<br>
-        • Boot do Sistema Operacional
+      -
       </p>
     </td>
     <td align="center">

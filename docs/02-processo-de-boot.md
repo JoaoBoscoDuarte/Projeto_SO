@@ -120,21 +120,25 @@ mov eax, 0xCAFEBABE
 O linker organiza o kernel em seções:
 
 ### .text (Código)
+
 - Contém instruções executáveis
 - Somente leitura
 - Primeira seção após o endereço base
 
 ### .rodata (Dados Read-Only)
+
 - Constantes e strings literais
 - Somente leitura
 - Protege dados contra modificação acidental
 
 ### .data (Dados Inicializados)
+
 - Variáveis globais com valores iniciais
 - Leitura e escrita
 - Valores são copiados do arquivo ELF
 
 ### .bss (Dados Não Inicializados)
+
 - Variáveis globais sem valor inicial
 - Automaticamente zeradas
 - Economiza espaço no arquivo (não armazena zeros)
@@ -169,19 +173,3 @@ O linker organiza o kernel em seções:
 - Permite múltiplas seções
 - Facilita debug e análise
 - Padrão em sistemas Unix/Linux
-
-## Próximos Passos
-
-Após o boot básico, o kernel precisará:
-
-1. **Configurar GDT** (Global Descriptor Table)
-2. **Habilitar interrupções**
-3. **Inicializar drivers** (teclado, vídeo)
-4. **Configurar gerenciamento de memória**
-5. **Criar processos**
-
-## Referências
-
-- [Multiboot Specification](https://www.gnu.org/software/grub/manual/multiboot/multiboot.html)
-- [ELF Format](https://en.wikipedia.org/wiki/Executable_and_Linkable_Format)
-- [x86 Memory Map](https://wiki.osdev.org/Memory_Map_(x86))

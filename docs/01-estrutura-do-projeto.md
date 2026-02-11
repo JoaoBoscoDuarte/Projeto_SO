@@ -28,6 +28,7 @@ projeto_so/
 ### Arquivos de Código Fonte
 
 #### `loader.s`
+
 - **Linguagem**: Assembly x86 (NASM)
 - **Função**: Ponto de entrada do sistema operacional
 - **Responsabilidades**:
@@ -36,6 +37,7 @@ projeto_so/
   - Transferir controle para o código C
 
 #### `kmain.c`
+
 - **Linguagem**: C
 - **Função**: Código principal do kernel
 - **Responsabilidades**:
@@ -46,6 +48,7 @@ projeto_so/
 ### Arquivos de Configuração
 
 #### `link.ld`
+
 - **Tipo**: Linker Script
 - **Função**: Define como o kernel é organizado na memória
 - **Especifica**:
@@ -54,6 +57,7 @@ projeto_so/
   - Alinhamento de memória
 
 #### `Makefile`
+
 - **Tipo**: Script de build
 - **Função**: Automatiza compilação e execução
 - **Comandos principais**:
@@ -63,6 +67,7 @@ projeto_so/
   - `make clean`: Remove arquivos gerados
 
 #### `bochsrc.txt`
+
 - **Tipo**: Configuração do emulador
 - **Função**: Define parâmetros do Bochs
 - **Configura**:
@@ -95,13 +100,3 @@ Estes arquivos podem ser removidos com `make clean`.
 3. **Linkagem**: `loader.o` + `kmain.o` → `kernel.elf` (LD)
 4. **Empacotamento**: `kernel.elf` + estrutura ISO → `os.iso` (genisoimage)
 5. **Execução**: `os.iso` → Bochs
-
-## Próximos Passos
-
-À medida que o projeto evolui, novos arquivos serão adicionados:
-
-- Drivers de dispositivos
-- Gerenciador de memória
-- Escalonador de processos
-- Sistema de arquivos
-- Interface de usuário

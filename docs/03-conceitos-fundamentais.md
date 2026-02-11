@@ -35,18 +35,21 @@ Registradores são pequenas áreas de memória extremamente rápidas dentro do p
 ### 1.2. Modos de Operação
 
 #### Real Mode (16 bits)
+
 - Modo inicial do processador
 - Acesso direto à memória
 - Limitado a 1 MB de RAM
 - Usado pela BIOS
 
 #### Protected Mode (32 bits)
+
 - Proteção de memória
 - Multitarefa
 - Acesso a mais de 1 MB de RAM
 - Usado por sistemas operacionais modernos
 
 #### Long Mode (64 bits)
+
 - Extensão do Protected Mode
 - Registradores de 64 bits
 - Mais memória endereçável
@@ -77,7 +80,7 @@ A pilha cresce **para baixo** (de endereços altos para baixos):
 Endereços Altos
     ↓
 [ESP] ← Topo da pilha
-[   ] 
+[   ]
 [   ]
 [   ] ← Base da pilha
     ↓
@@ -272,31 +275,3 @@ Sinais que pausam a execução normal para tratar eventos:
 ### 9.2. IDT (Interrupt Descriptor Table)
 
 Tabela que mapeia números de interrupção para handlers.
-
-## 10. Próximos Conceitos
-
-À medida que o projeto evolui, serão necessários:
-
-- **GDT** (Global Descriptor Table)
-- **Paginação**
-- **Processos e Threads**
-- **Escalonamento**
-- **Sincronização**
-- **Sistema de Arquivos**
-
-## Glossário
-
-- **BIOS**: Basic Input/Output System
-- **POST**: Power-On Self Test
-- **IVT**: Interrupt Vector Table
-- **GDT**: Global Descriptor Table
-- **IDT**: Interrupt Descriptor Table
-- **ISR**: Interrupt Service Routine
-- **IRQ**: Interrupt Request
-- **DMA**: Direct Memory Access
-
-## Referências
-
-- [Intel Software Developer Manuals](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html)
-- [OSDev Wiki](https://wiki.osdev.org/)
-- [x86 Assembly Guide](https://www.cs.virginia.edu/~evans/cs216/guides/x86.html)
