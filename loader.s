@@ -41,10 +41,20 @@
     ; ----------------------------------------------------------------------------
     ; Esta é a primeira função executada quando o GRUB transfere controle
     ; para o kernel. Ela configura o ambiente básico e entra em loop.
+
+    extern kmain
     
     loader:                                         ; Label do loader (definido como entry point no linker)
         mov eax, 0xCAFEBABE                         ; Coloca valor 0xCAFEBABE em EAX (para debug/teste)
         mov esp, kernel_stack + KERNEL_STACK_SIZE   ; Configura ESP para apontar para o topo da pilha
                                                     ; (pilha cresce para baixo, então ESP aponta para o fim)
+        
+        extern sum_of_three   ; the function sum_of_three is defined elsewhere
+
+        push dword 3            ; arg3
+        push dword 2            ; arg2
+        push dword 5            ; arg1
+        call sum_of_three       ; call the function, the result will be in eax
+
     .loop:
         jmp .loop                   ; Loop infinito - mantém o kernel em execução
