@@ -1,12 +1,16 @@
-    megs:            32
-    display_library: x
+megs: 32
+display_library: x
 
-    romimage:        file=/usr/share/bochs/BIOS-bochs-latest
-    vgaromimage:     file=/usr/share/bochs/VGABIOS-lgpl-latest
+romimage: file=/usr/share/bochs/BIOS-bochs-latest
+vgaromimage: file=/usr/share/bochs/VGABIOS-lgpl-latest
 
-    ata0-master:     type=cdrom, path=os.iso, status=inserted
-    boot:            cdrom
-    
-    log:             bochslog.txt
-    clock:           sync=realtime, time0=local
-    cpu:             count=1, ips=1000000
+# IMPORTANTE: use caminho absoluto para a ISO
+ata0-master: type=cdrom, path=/home/samuel/projects/Projeto_SO/os.iso, status=inserted
+
+boot: cdrom
+
+debugger: off
+
+log: bochslog.txt
+clock: sync=realtime, time0=local
+cpu: count=1, ips=1000000

@@ -20,9 +20,10 @@ SECTIONS {
     /* Seção .text - Código executável
      * Contém todas as instruções do programa (assembly e C compilado)
      */
-    .text ALIGN (0x1000) :   /* Alinha em 4 KB (0x1000 = 4096 bytes) */
+    .text ALIGN (0x1000) :
     {
-        *(.text)             /* Inclui todas as seções .text de todos os arquivos objeto */
+        *(.multiboot)
+        *(.text)
     }
 
     /* Seção .rodata - Dados somente leitura
