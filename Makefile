@@ -1,93 +1,96 @@
 # ==============================================================================
-# MAKEFILE - Sistema de Build do Sistema Operacional
-# ==============================================================================
-# Este Makefile automatiza o processo de compilação, linkagem e criação da
-# imagem ISO bootável do sistema operacional.
+# MAKEFILE - Projeto_SO (Kernel ELF + ISO GRUB2 + QEMU)
 # ==============================================================================
 
-# ------------------------------------------------------------------------------
-# Variáveis de Configuração
-# ------------------------------------------------------------------------------
+# -----------------------------
+# Toolchain
+# -----------------------------
+CC      = gcc
+AS      = nasm
+LD      = ld
 
-# Arquivos objeto que serão linkados para formar o kernel
-OBJECTS = loader.o kmain.o
+CFLAGS  = -m32 -nostdlib -nostdinc -fno-builtin -fno-stack-protector \
+          -nostartfiles -nodefaultlibs -Wall -Wextra -Werror -c
 
-# Compilador C
-CC = gcc
-
-# Flags do compilador C:
-# -m32: compila para arquitetura 32 bits
-# -nostdlib: não usa biblioteca padrão do C
-# -nostdinc: não usa headers padrão do C
-# -fno-builtin: desabilita funções built-in do compilador
-# -fno-stack-protector: desabilita proteção de pilha
-# -nostartfiles: não usa arquivos de inicialização padrão
-# -nodefaultlibs: não usa bibliotecas padrão
-# -Wall -Wextra -Werror: habilita todos os warnings e os trata como erros
-# -c: compila sem linkar
-CFLAGS = -m32 -nostdlib -nostdinc -fno-builtin -fno-stack-protector \
-			-nostartfiles -nodefaultlibs -Wall -Wextra -Werror -c
-
-# Flags do linker:
-# -T link.ld: usa o script de linker customizado
-# -melf_i386: gera binário no formato ELF 32 bits para i386
+ASFLAGS = -f elf
 LDFLAGS = -T link.ld -melf_i386
 
-# Assembler NASM
-AS = nasm
+QEMU    = qemu-system-i386
 
-# Flags do assembler:
-# -f elf: gera arquivo objeto no formato ELF
-ASFLAGS = -f elf
+# -----------------------------
+# Artifacts
+# -----------------------------
+ISO     = os.iso
+HDD_IMG = hdd.img
+FD_IMG  = floppy.img
 
-# ------------------------------------------------------------------------------
-# Regras de Build
-# ------------------------------------------------------------------------------
+# Objetos do kernel
+OBJECTS = loader.o kmain.o idt.o isr.o idt_load.o isr_stubs.o screen.o
 
-# Regra padrão: compila o kernel
-all: kernel.elf
+# -----------------------------
+# Default
+# -----------------------------
+all: $(ISO)
 
-# Cria o executável do kernel linkando todos os arquivos objeto
+# -----------------------------
+# Build kernel
+# -----------------------------
 kernel.elf: $(OBJECTS)
-	ld $(LDFLAGS) $(OBJECTS) -o kernel.elf
+	$(LD) $(LDFLAGS) $(OBJECTS) -o $@
 
-# Cria a imagem ISO bootável
-os.iso: kernel.elf
-	cp kernel.elf iso/boot/kernel.elf
-	# genisoimage cria a imagem ISO com:
-	# -R: usa extensões Rock Ridge (nomes longos)
-	# -b: especifica o arquivo de boot (stage2_eltorito do GRUB)
-	# -no-emul-boot: modo de boot sem emulação
-	# -boot-load-size 4: carrega 4 setores de 512 bytes
-	# -A os: nome da aplicação
-	# -input-charset utf8: usa UTF-8 para nomes de arquivo
-	# -quiet: modo silencioso
-	# -boot-info-table: cria tabela de informações de boot
-	# -o os.iso: arquivo de saída
-	# iso: diretório fonte
-	genisoimage -R                              \
-				-b boot/grub/stage2_eltorito    \
-				-no-emul-boot                   \
-				-boot-load-size 4               \
-				-A os                           \
-				-input-charset utf8             \
-				-quiet                          \
-				-boot-info-table                \
-				-o os.iso                       \
-				iso
-
-# Compila e executa o SO no emulador Bochs
-run: os.iso
-	bochs -f bochsrc.txt -q
-
-# Regra genérica: compila arquivos .c em .o
 %.o: %.c
-	$(CC) $(CFLAGS)  $< -o $@
+	$(CC) $(CFLAGS) $< -o $@
 
-# Regra genérica: monta arquivos .s (assembly) em .o
 %.o: %.s
 	$(AS) $(ASFLAGS) $< -o $@
 
-# Remove todos os arquivos gerados
+# -----------------------------
+# GRUB2 ISO layout
+# -----------------------------
+iso/boot/kernel.elf: kernel.elf
+	mkdir -p iso/boot
+	cp kernel.elf iso/boot/kernel.elf
+
+iso/boot/grub/grub.cfg:
+	mkdir -p iso/boot/grub
+	printf '%s\n' \
+		'set timeout_style=menu' \
+		'set timeout=5' \
+		'set default=0' \
+		'' \
+		'menuentry "Meu Kernel" {' \
+		'  multiboot /boot/kernel.elf' \
+		'  boot' \
+		'}' \
+		> iso/boot/grub/grub.cfg
+
+$(ISO): iso/boot/kernel.elf iso/boot/grub/grub.cfg
+	grub-mkrescue -o $(ISO) iso
+
+# -----------------------------
+# Run (QEMU)
+# -----------------------------
+run: run-cd
+
+run-cd: $(ISO)
+	$(QEMU) -cdrom $(ISO) -boot order=d -no-reboot -no-shutdown
+
+# HD/Floppy: existem pra testar ordem, mas imagens vazias não bootam (normal).
+$(HDD_IMG):
+	qemu-img create -f raw $(HDD_IMG) 50M
+
+$(FD_IMG):
+	dd if=/dev/zero of=$(FD_IMG) bs=512 count=2880
+
+run-hd: $(ISO) $(HDD_IMG)
+	$(QEMU) -hda $(HDD_IMG) -cdrom $(ISO) -boot order=c -no-reboot -no-shutdown
+
+run-fd: $(ISO) $(FD_IMG)
+	$(QEMU) -fda $(FD_IMG) -cdrom $(ISO) -boot order=a -no-reboot -no-shutdown
+
+# -----------------------------
+# Clean
+# -----------------------------
 clean:
-	rm -rf *.o kernel.elf os.iso
+	rm -rf *.o kernel.elf $(ISO) $(HDD_IMG) $(FD_IMG)
+	rm -rf iso/boot/kernel.elf iso/boot/grub/grub.cfg
