@@ -1,11 +1,21 @@
     megs:            32
-    display_library: x
+    display_library: x, options="gui_debug"
 
     romimage:        file=/usr/share/bochs/BIOS-bochs-latest
     vgaromimage:     file=/usr/share/bochs/VGABIOS-lgpl-latest
 
     ata0-master:     type=cdrom, path=os.iso, status=inserted
     boot:            cdrom
+
+    # Habilita a interrupção mágica (importante para o próximo passo)
+    magic_break: enabled=1
+
+    # Garante que o log de erros e status saia no terminal
+    log: bochslog.txt
+    panic: action=ask
+    error: action=report
+    info: action=report
+    debug: action=ignore
 
     com1: enabled=1, mode=file, dev=com1.out
     
