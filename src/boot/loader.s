@@ -45,7 +45,6 @@
     extern kmain
     
     loader:                                         ; Label do loader (definido como entry point no linker)
-        mov eax, 0xCAFEBABE                         ; Coloca valor 0xCAFEBABE em EAX (para debug/teste)
         mov esp, kernel_stack + KERNEL_STACK_SIZE   ; Configura ESP para apontar para o topo da pilha
                                                     ; (pilha cresce para baixo, então ESP aponta para o fim)
         

@@ -1,8 +1,17 @@
 # Build artifacts
+build/
 *.elf
 *.o
 *.iso
 
-# Logs 
+# Bochs logs
 bochslog.txt
-*.iso
+com1.out
+
+# IDE
+.vscode/
+.idea/
+
+# Temporários
+*~
+*.swp

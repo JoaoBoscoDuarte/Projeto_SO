@@ -6,6 +6,8 @@
 
     ata0-master:     type=cdrom, path=os.iso, status=inserted
     boot:            cdrom
+
+    com1: enabled=1, mode=file, dev=com1.out
     
     log:             bochslog.txt
     clock:           sync=realtime, time0=local
