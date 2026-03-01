@@ -15,7 +15,7 @@ ASFLAGS = -f elf
 # Arquivos objeto
 OBJECTS = $(BUILD_DIR)/loader.o $(BUILD_DIR)/kmain.o \
           $(BUILD_DIR)/io.o $(BUILD_DIR)/fb.o \
-          $(BUILD_DIR)/serial.o
+          $(BUILD_DIR)/serial.o $(BUILD_DIR)/printf.o
 
 all: kernel.elf
 
@@ -47,6 +47,9 @@ $(BUILD_DIR)/fb.o: $(SRC_DIR)/drivers/fb.c
 	$(CC) $(CFLAGS) $< -o $@
 
 $(BUILD_DIR)/serial.o: $(SRC_DIR)/drivers/serial.c
+	$(CC) $(CFLAGS) $< -o $@
+
+$(BUILD_DIR)/printf.o: $(SRC_DIR)/lib/printf.c
 	$(CC) $(CFLAGS) $< -o $@
 
 clean:

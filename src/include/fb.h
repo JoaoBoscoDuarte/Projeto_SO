@@ -18,6 +18,7 @@
 #define FB_LIGHT_BROWN   14
 #define FB_WHITE         15
 
+void fb_clear(void);
 void fb_write_cell(unsigned int i, char c, unsigned char fg, unsigned char bg);
 void fb_move_cursor(unsigned short pos);
 int fb_write(char *buf, unsigned int len);
