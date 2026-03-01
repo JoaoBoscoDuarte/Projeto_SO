@@ -49,12 +49,7 @@
         mov esp, kernel_stack + KERNEL_STACK_SIZE   ; Configura ESP para apontar para o topo da pilha
                                                     ; (pilha cresce para baixo, então ESP aponta para o fim)
         
-        extern sum_of_three   ; the function sum_of_three is defined elsewhere
-
-        push dword 3            ; arg3
-        push dword 2            ; arg2
-        push dword 5            ; arg1
-        call sum_of_three       ; call the function, the result will be in eax
+        call kmain
 
     .loop:
         jmp .loop                   ; Loop infinito - mantém o kernel em execução
