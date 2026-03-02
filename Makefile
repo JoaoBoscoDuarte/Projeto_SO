@@ -4,17 +4,17 @@ BUILD_DIR = build
 ISO_DIR = iso
 
 # Compiladores e Ferramentas
-CC = i686-elf-gcc
+CC = gcc
 CFLAGS = -m32 -nostdlib -nostdinc -fno-builtin -fno-stack-protector \
          -nostartfiles -nodefaultlibs -Wall -Wextra -Werror -c \
          -I$(SRC_DIR)/include
-LD = i686-elf-ld
+LD = ld
 LDFLAGS = -T link.ld -melf_i386
 AS = nasm
 ASFLAGS = -f elf
 
 # CAMINHO DO GRUB (Atualizado conforme seu retorno)
-GRUB_MKRESCUE = /opt/homebrew/bin/i686-elf-grub-mkrescue
+GENISOIMAGE = genisoimage
 
 # Arquivos objeto
 OBJECTS = $(BUILD_DIR)/loader.o \
@@ -38,7 +38,13 @@ kernel.elf: $(BUILD_DIR) $(OBJECTS)
 os.iso: kernel.elf
 	@mkdir -p $(ISO_DIR)/boot/grub
 	cp kernel.elf $(ISO_DIR)/boot/kernel.elf
-	$(GRUB_MKRESCUE) -o os.iso $(ISO_DIR)
+	echo 'set timeout=0' > $(ISO_DIR)/boot/grub/grub.cfg
+	echo 'set default=0' >> $(ISO_DIR)/boot/grub/grub.cfg
+	echo 'menuentry "os" {' >> $(ISO_DIR)/boot/grub/grub.cfg
+	echo '  multiboot /boot/kernel.elf' >> $(ISO_DIR)/boot/grub/grub.cfg
+	echo '}' >> $(ISO_DIR)/boot/grub/grub.cfg
+	grub-mkrescue -o os.iso $(ISO_DIR)
+
 
 run: os.iso
 	bochs -f bochsrc.txt -q

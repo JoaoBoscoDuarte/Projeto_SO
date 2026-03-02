@@ -1,9 +1,9 @@
 megs:            32
-display_library: sdl2
+display_library: x
 mouse: enabled=0
 
-romimage: file="/opt/homebrew/share/bochs/BIOS-bochs-latest"
-vgaromimage: file="/opt/homebrew/share/bochs/VGABIOS-elpin-2.40"
+romimage: file="/usr/share/bochs/BIOS-bochs-latest"
+vgaromimage: file="/usr/share/bochs/VGABIOS-lgpl-latest"
 
 ata0-master: type=cdrom, path=os.iso, status=inserted
 boot: cdrom
