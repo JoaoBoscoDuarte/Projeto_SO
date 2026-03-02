@@ -12,10 +12,18 @@ projeto_so/
 ├── iso/                     # Estrutura para criação da imagem ISO bootável
 │   └── boot/
 │       ├── grub/           # Configuração do bootloader GRUB
+│       │   ├── grub.cfg    # Script de configuração do GRUB2
 │       │   ├── menu.lst    # Menu de boot do GRUB
 │       │   └── stage2_eltorito  # Stage 2 do GRUB para boot em CD/ISO
 │       └── kernel.elf      # Kernel compilado (copiado durante build)
 ├── loader.s                # Código assembly do bootloader
+├── src/
+│   ├── drivers/
+│   │   ├── fb.c             # Driver de Framebuffer (Vídeo)
+│   │   ├── keyboard.c       # Driver de Teclado (Scancodes e ASCII)
+│   │   ├── idt.c            # Tabela de Descritores de Interrupção
+│   │   ├── pic.c            # Controlador de Interrupções Programável
+│   │   └── gdt.c            # Global Descriptor Table
 ├── kmain.c                 # Código C principal do kernel
 ├── link.ld                 # Script de linker
 ├── Makefile               # Automação de build
@@ -26,6 +34,38 @@ projeto_so/
 ## Descrição dos Arquivos
 
 ### Arquivos de Código Fonte
+
+### `keyboard.c`
+- **Linguagem**: C
+- **Função**: Driver de entrada do teclado
+- **Responsabilidades**:
+  - Comunicar-se com o controlador i8042 via porta I/O 0x60
+  - Traduzir scancodes brutos de hardware para caracteres ASCII
+  - Processar teclas de controle como Enter e Backspace
+
+### `idt.c`
+- **Linguagem**: C
+- **Função**: Gerenciador de interrupt descriptor table
+- **Responsabilidades**:
+  - Definir os portões (gates) de interrupção do processador
+  - Mapear sinais de hardware para funções específicas em C (handlers)
+  - Prevenir Triple Faults ao garantir que interrupções inesperadas sejam tratadas
+
+### `pic.c`
+- **Linguagem**: C
+- **Função**: Driver do Programmable Interrupt Controller (8259A)
+- **Responsabilidades**:
+  - Remapear os vetores de interrupção para evitar conflitos com exceções da CPU
+  - Mascarar ou desmascarar IRQs específicas (como ativar o teclado e silenciar o timer)
+  - Gerenciar o envio de sinais de confirmação (EOI - End of Interrupt)
+
+### `gdt.c`
+- **Linguagem**: C
+- **Função**: Gerenciador da Global Descriptor Table
+- **Responsabilidades**:
+  - Definir os segmentos de memória (Código e Dados) e seus privilégios (Ring 0)
+  - Configurar o limite e a base da memória endereçável no modo protegido
+  - Garantir a estabilidade da CPU antes da ativação das interrupções
 
 #### `loader.s`
 
@@ -82,6 +122,7 @@ O diretório `iso/` contém a estrutura necessária para criar uma imagem ISO bo
 - **boot/grub/menu.lst**: Configuração do menu do GRUB
 - **boot/grub/stage2_eltorito**: Bootloader GRUB para CD-ROM
 - **boot/kernel.elf**: Kernel compilado (copiado durante o build)
+- **boot/grub/grub.cfg**: Instrui o bootloader sobre como carregar o kernel
 
 ## Arquivos Gerados
 

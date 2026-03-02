@@ -10,9 +10,9 @@ void gdt_set_gate(int num, unsigned int base, unsigned int limit, unsigned char 
     gdt[num].base_high   = (base >> 24) & 0xFF;
 
     gdt[num].limit_low   = (limit & 0xFFFF);
+    // Ajuste aqui:
     gdt[num].granularity = (limit >> 16) & 0x0F;
-
-    gdt[num].granularity |= gran & 0xF0;
+    gdt[num].granularity |= (gran & 0xF0);
     gdt[num].access      = access;
 }
 

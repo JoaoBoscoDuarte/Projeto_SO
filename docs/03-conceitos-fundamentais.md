@@ -275,3 +275,15 @@ Sinais que pausam a execução normal para tratar eventos:
 ### 9.2. IDT (Interrupt Descriptor Table)
 
 Tabela que mapeia números de interrupção para handlers.
+
+### 10. Comunicação com Hardware (I/O)
+
+- I/O Ports: O x86 possui um espaço de endereçamento separado para hardware. Usamos outb para enviar comandos e inb para ler dados (ex: porta 0x60 para teclado).
+
+- Memory Mapped I/O (MMIO): Técnica onde o hardware mapeia seus registros em endereços de memória RAM comum. O Framebuffer (vídeo) usa isso em 0xB8000.
+
+### 11. O Fluxo de uma Interrupção
+- 1. Evento: Uma tecla é pressionada.
+- 2. PIC: O controlador de interrupções avisa a CPU através de um sinal elétrico.
+- 3. IDT: A CPU consulta esta tabela para achar o endereço do "Handler" (nosso código em C).
+- 4. Context Switch: A CPU salva o que estava fazendo, executa o driver do teclado e depois volta ao normal.

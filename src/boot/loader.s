@@ -10,13 +10,14 @@
     ; ----------------------------------------------------------------------------
     ; Constantes do Multiboot
     ; ----------------------------------------------------------------------------
-    ; O Multiboot é um padrão que permite que bootloaders como GRUB carreguem
-    ; kernels de forma padronizada. Requer um cabeçalho específico no início.
+    MAGIC_NUMBER equ 0x1BADB002     
     
-    MAGIC_NUMBER equ 0x1BADB002     ; Número mágico do Multiboot (identifica o kernel)
-    FLAGS        equ 0x0            ; Flags do Multiboot (0x0 = sem requisitos especiais)
-    CHECKSUM     equ -MAGIC_NUMBER  ; Checksum: deve fazer MAGIC + FLAGS + CHECKSUM = 0
-    KERNEL_STACK_SIZE equ 4096      ; Tamanho da pilha do kernel: 4KB
+    ; FLAGS: Bit 0 (alinhamento) + Bit 1 (info de memória)
+    ; Isso garante que o GRUB configure a máquina de forma mais estável.
+    FLAGS        equ 0x00000003     
+    
+    CHECKSUM     equ -(MAGIC_NUMBER + FLAGS)  
+    KERNEL_STACK_SIZE equ 4096
 
     ; ----------------------------------------------------------------------------
     ; Seção BSS - Block Started by Symbol (dados não inicializados)
@@ -29,11 +30,11 @@
     ; ----------------------------------------------------------------------------
     ; Seção TEXT - Código executável
     ; ----------------------------------------------------------------------------
-    section .text:                  ; Início da seção de código
+    section .multiboot                   ; Início da seção de código
     align 4                         ; Código deve estar alinhado em 4 bytes
         dd MAGIC_NUMBER             ; Escreve o número mágico no binário
         dd FLAGS                    ; Escreve as flags
-        dd CHECKSUM                 ; Escreve o checksum
+        dd -(MAGIC_NUMBER + FLAGS) ; Cálculo explícito para não ter erro de sinal
                                     ; Estes 3 valores formam o cabeçalho Multiboot
 
     ; ----------------------------------------------------------------------------

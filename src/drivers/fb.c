@@ -6,24 +6,22 @@
 #define FB_HIGH_BYTE    14
 #define FB_LOW_BYTE     15
 
-static char *fb = (char *) 0x000B8000;
+// static char *fb = (char *) 0x000B8000;
 static unsigned short cursor_pos = 0;
 
-void fb_clear(void)
-{
-    unsigned int i;
-    for (i = 0; i < 80 * 25; i++) {
-        fb[i * 2] = ' ';
-        fb[i * 2 + 1] = ((FB_BLACK & 0x0F) << 4) | (FB_WHITE & 0x0F);
+void fb_clear(void) {
+    unsigned char *mem_vga = (unsigned char *) 0x000B8000;
+    for (int i = 0; i < 80 * 25 * 2; i += 2) {
+        mem_vga[i] = ' ';      // Espaço vazio
+        mem_vga[i+1] = 0x07;   // 0x07 é Cinza Claro no Preto (Legível e padrão)
     }
-    cursor_pos = 0;
-    fb_move_cursor(cursor_pos);
 }
 
 void fb_write_cell(unsigned int i, char c, unsigned char fg, unsigned char bg)
 {
-    fb[i * 2] = c;
-    fb[i * 2 + 1] = ((bg & 0x0F) << 4) | (fg & 0x0F);
+    unsigned char *mem_vga = (unsigned char *) 0x000B8000; // Force o ponteiro aqui
+    mem_vga[i * 2] = c;
+    mem_vga[i * 2 + 1] = ((bg & 0x0F) << 4) | (fg & 0x0F);
 }
 
 void fb_move_cursor(unsigned short pos)
@@ -53,4 +51,22 @@ int fb_write(char *buf, unsigned int len)
     }
     fb_move_cursor(cursor_pos);
     return (int)len;
+}
+
+void fb_put_char(unsigned int row, unsigned int col, char c, unsigned char fg, unsigned char bg) {
+    unsigned char *fb = (unsigned char *) 0xB8000;
+    unsigned int index = 2 * (row * 80 + col);
+    fb[index] = c;           // Byte 0: Caractere
+    fb[index + 1] = ((bg & 0x0F) << 4) | (fg & 0x0F); // Byte 1: Cor
+}
+
+void fb_scroll(void) {
+    unsigned char *mem_vga = (unsigned char *) 0x000B8000;
+    for (int i = 0; i < 80 * 24 * 2; i++) {
+        mem_vga[i] = mem_vga[i + 80 * 2];
+    }
+    for (int i = 80 * 24 * 2; i < 80 * 25 * 2; i += 2) {
+        mem_vga[i] = ' ';
+        mem_vga[i+1] = 0x07; // Fundo preto
+    }
 }

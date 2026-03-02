@@ -437,3 +437,12 @@ genisoimage -R \
    - `mov eax, 0xCAFEBABE`
    - `mov esp, kernel_stack + 4096`
    - Loop infinito
+
+## 5. Lógica de intreface e teclado
+### Lógica de scroll:
+- Quando a posição do cursor atinge 2000 (80 colunas * 25 linhas), a função fb_scroll é chamada.
+- Ela move os dados da memória de vídeo uma linha para cima e limpa a última linha.
+
+### Processamento de teclas especiais:
+- Enter `(\n)`: Move o cursor para o próximo múltiplo de 80.
+Backspace `(\b)`: Decrementa a posição e substitui o caractere anterior por um espaço vazio.
