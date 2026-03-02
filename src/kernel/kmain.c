@@ -6,14 +6,10 @@
 // ============================================================================
 // kmain - Função principal do kernel
 // ============================================================================
-// Esta é a primeira função C executada. Inicializa todos os subsistemas.
-// Chamada pelo loader.s após configurar a pilha.
-// ============================================================================
+
 void kmain(void)
 {
     // 1. Inicializa a GDT (Global Descriptor Table)
-    // Define segmentos de memória para modo protegido x86
-    // Necessário para o processador funcionar corretamente
     gdt_init();
 
     // 2. Inicializa a porta serial (COM1)

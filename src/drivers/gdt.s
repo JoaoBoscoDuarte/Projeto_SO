@@ -1,35 +1,26 @@
-; ============================================================================
-; GDT.S - Carrega a GDT no processador
-; ============================================================================
+global gdt_flush
 
-global gdt_flush    ; Exporta para C
-
-; ============================================================================
-; gdt_flush - Carrega a nova GDT e atualiza registradores de segmento
-; ============================================================================
-; Parâmetro: ponteiro para gdt_ptr (passado na pilha)
 gdt_flush:
-    mov eax, [esp + 4]  ; EAX = endereço da estrutura gdt_ptr
-    lgdt [eax]          ; LGDT: Load Global Descriptor Table
-                        ; Carrega a GDT no registrador GDTR do processador
+    ; Pega o endereço da estrutura 'gp' que enviamos do C
+    mov eax, [esp + 4]  
     
-    xchg bx, bx         ; MAGIC BREAKPOINT do Bochs
-                        ; Esta instrução é NOP normal, mas o Bochs
-                        ; a reconhece e pausa a execução para debug
-    
-    ; Atualiza os registradores de segmento de DADOS
-    ; Todos apontam para o segmento 2 da GDT (offset 0x10)
-    mov ax, 0x10        ; 0x10 = 16 = segundo segmento (dados)
-    mov ds, ax          ; DS = Data Segment
-    mov es, ax          ; ES = Extra Segment
-    mov fs, ax          ; FS = Extra Segment
-    mov gs, ax          ; GS = Extra Segment
-    mov ss, ax          ; SS = Stack Segment
-    
-    ; Atualiza o registrador de segmento de CÓDIGO (CS)
-    ; CS não pode ser modificado diretamente, precisa de FAR JUMP
-    ; Far jump: salta para um endereço em outro segmento
-    jmp 0x08:.flush     ; Salta para segmento 0x08 (código), label .flush
-                        ; Isso força o CS a ser atualizado para 0x08
+    ; O comando LGDT (Load GDT) diz ao processador usar a tabela
+    lgdt [eax]          
+
+    ; Agora precisamos atualizar os "registradores de segmento".
+    ; Eles são como atalhos no CPU que precisam apontar para o crachá 2 (Dados).
+    ; 0x10 é o endereço da Entrada 2 (cada entrada tem 8 bytes, então 2 * 8 = 16, ou 0x10 em hexadecimal).
+    mov ax, 0x10        
+    mov ds, ax          ; Atualiza Segmento de Dados
+    mov es, ax          ; Atualiza Segmento Extra
+    mov fs, ax          ; Atualiza outro Extra
+    mov gs, ax          ; Atualiza mais um Extra
+    mov ss, ax          ; Atualiza a Pilha (onde as funções rodam)
+
+    ; O Segmento de Código (CS) é especial. Não dá para usar 'mov'.
+    ; Temos que dar um "pulo" (jump) para forçar o CPU a recarregar o CS.
+    ; 0x08 aponta para a Entrada 1 (1 * 8 = 8).
+    jmp 0x08:.flush     
+
 .flush:
-    ret                 ; Retorna para C
+    ret                 ; Pronto! O modo protegido está configurado.
