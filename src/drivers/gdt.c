@@ -19,13 +19,10 @@ void gdt_set_gate(int num, unsigned int base, unsigned int limit,
 
     // O tamanho do segmento (limit) também é fatiado em 2.
     gdt[num].limit_low   = (limit & 0xFFFF);
+    // Ajuste aqui:
     gdt[num].granularity = (limit >> 16) & 0x0F;
-
-    // Aqui colocamos as "configurações extras"
-    gdt[num].granularity |= gran & 0xF0;
-    
-    // O "access" define quem pode usar: Kernel (privilegiado) ou Usuário.
-    gdt[num].access = access;
+    gdt[num].granularity |= (gran & 0xF0);
+    gdt[num].access      = access;
 }
 
 void gdt_init() {

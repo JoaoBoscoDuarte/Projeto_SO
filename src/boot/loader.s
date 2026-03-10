@@ -10,18 +10,14 @@
     ; ----------------------------------------------------------------------------
     ; Constantes do Multiboot (Especificação para bootloaders)
     ; ----------------------------------------------------------------------------
-    ; O Multiboot é um padrão que permite que bootloaders como GRUB carreguem
-    ; kernels de forma padronizada. Requer um cabeçalho específico no início.
+    MAGIC_NUMBER equ 0x1BADB002     
     
-    MAGIC_NUMBER equ 0x1BADB002     ; Número mágico que identifica um kernel Multiboot
-                                    ; O GRUB procura por este valor no binário
+    ; FLAGS: Bit 0 (alinhamento) + Bit 1 (info de memória)
+    ; Isso garante que o GRUB configure a máquina de forma mais estável.
+    FLAGS        equ 0x00000003     
     
-    FLAGS        equ 0x0            ; Flags do Multiboot (0x0 = sem requisitos especiais)
-    
-    CHECKSUM     equ -MAGIC_NUMBER  ; Checksum: MAGIC + FLAGS + CHECKSUM = 0
-                                    ; Validação de integridade do cabeçalho
-    
-    KERNEL_STACK_SIZE equ 4096      ; Tamanho da pilha: 4KB (suficiente para início)
+    CHECKSUM     equ -(MAGIC_NUMBER + FLAGS)  
+    KERNEL_STACK_SIZE equ 4096
 
     ; ----------------------------------------------------------------------------
     ; Seção BSS - Block Started by Symbol (dados não inicializados)
@@ -35,13 +31,12 @@
     ; ----------------------------------------------------------------------------
     ; Seção TEXT - Código executável
     ; ----------------------------------------------------------------------------
-    ; DEVE estar nos primeiros 8KB do binário para o GRUB encontrar
-    section .text:
-    align 4                         ; Alinhamento obrigatório de 4 bytes
-        dd MAGIC_NUMBER             ; Escreve o número mágico (4 bytes)
-        dd FLAGS                    ; Escreve as flags (4 bytes)
-        dd CHECKSUM                 ; Escreve o checksum (4 bytes)
-                                    ; Estes 12 bytes formam o cabeçalho Multiboot
+    section .multiboot                   ; Início da seção de código
+    align 4                         ; Código deve estar alinhado em 4 bytes
+        dd MAGIC_NUMBER             ; Escreve o número mágico no binário
+        dd FLAGS                    ; Escreve as flags
+        dd -(MAGIC_NUMBER + FLAGS) ; Cálculo explícito para não ter erro de sinal
+                                    ; Estes 3 valores formam o cabeçalho Multiboot
 
     extern kmain                    ; Declara que kmain() está definida em outro arquivo (C)
     

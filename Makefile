@@ -3,31 +3,48 @@ SRC_DIR = src
 BUILD_DIR = build
 ISO_DIR = iso
 
-# Compiladores
+# Compiladores e Ferramentas
 CC = gcc
 CFLAGS = -m32 -nostdlib -nostdinc -fno-builtin -fno-stack-protector \
          -nostartfiles -nodefaultlibs -Wall -Wextra -Werror -c \
          -I$(SRC_DIR)/include
+LD = ld
 LDFLAGS = -T link.ld -melf_i386
 AS = nasm
 ASFLAGS = -f elf
 
-# Arquivos objeto (ADICIONADOS: gdt.o e gdt_s.o)
-OBJECTS = $(BUILD_DIR)/loader.o $(BUILD_DIR)/kmain.o \
-          $(BUILD_DIR)/io.o $(BUILD_DIR)/fb.o \
-          $(BUILD_DIR)/serial.o $(BUILD_DIR)/printf.o \
-          $(BUILD_DIR)/gdt.o $(BUILD_DIR)/gdt_s.o
+# CAMINHO DO GRUB (Atualizado conforme seu retorno)
+GENISOIMAGE = genisoimage
+
+# Arquivos objeto
+OBJECTS = $(BUILD_DIR)/loader.o \
+          $(BUILD_DIR)/kmain.o \
+          $(BUILD_DIR)/io.o \
+          $(BUILD_DIR)/fb.o \
+          $(BUILD_DIR)/serial.o \
+          $(BUILD_DIR)/printf.o \
+          $(BUILD_DIR)/gdt.o \
+          $(BUILD_DIR)/gdt_s.o \
+          $(BUILD_DIR)/pic.o \
+          $(BUILD_DIR)/idt.o \
+          $(BUILD_DIR)/interrupts.o \
+          $(BUILD_DIR)/keyboard.o
 
 all: kernel.elf
 
 kernel.elf: $(BUILD_DIR) $(OBJECTS)
-	ld $(LDFLAGS) $(OBJECTS) -o kernel.elf
+	$(LD) $(LDFLAGS) $(OBJECTS) -o kernel.elf
 
 os.iso: kernel.elf
+	@mkdir -p $(ISO_DIR)/boot/grub
 	cp kernel.elf $(ISO_DIR)/boot/kernel.elf
-	genisoimage -R -b boot/grub/stage2_eltorito -no-emul-boot \
-                -boot-load-size 4 -A os -input-charset utf8 -quiet \
-                -boot-info-table -o os.iso $(ISO_DIR)
+	echo 'set timeout=0' > $(ISO_DIR)/boot/grub/grub.cfg
+	echo 'set default=0' >> $(ISO_DIR)/boot/grub/grub.cfg
+	echo 'menuentry "os" {' >> $(ISO_DIR)/boot/grub/grub.cfg
+	echo '  multiboot /boot/kernel.elf' >> $(ISO_DIR)/boot/grub/grub.cfg
+	echo '}' >> $(ISO_DIR)/boot/grub/grub.cfg
+	grub-mkrescue -o os.iso $(ISO_DIR)
+
 
 run: os.iso
 	bochs -f bochsrc.txt -q
@@ -46,11 +63,9 @@ $(BUILD_DIR)/kmain.o: $(SRC_DIR)/kernel/kmain.c
 $(BUILD_DIR)/io.o: $(SRC_DIR)/drivers/io.s
 	$(AS) $(ASFLAGS) $< -o $@
 
-# Regra para o código C da GDT
 $(BUILD_DIR)/gdt.o: $(SRC_DIR)/drivers/gdt.c
 	$(CC) $(CFLAGS) $< -o $@
 
-# Regra para o código Assembly da GDT (gdt_flush)
 $(BUILD_DIR)/gdt_s.o: $(SRC_DIR)/drivers/gdt.s
 	$(AS) $(ASFLAGS) $< -o $@
 
@@ -61,6 +76,18 @@ $(BUILD_DIR)/serial.o: $(SRC_DIR)/drivers/serial.c
 	$(CC) $(CFLAGS) $< -o $@
 
 $(BUILD_DIR)/printf.o: $(SRC_DIR)/lib/printf.c
+	$(CC) $(CFLAGS) $< -o $@
+
+$(BUILD_DIR)/pic.o: $(SRC_DIR)/drivers/pic.c
+	$(CC) $(CFLAGS) $< -o $@
+
+$(BUILD_DIR)/idt.o: $(SRC_DIR)/drivers/idt.c
+	$(CC) $(CFLAGS) $< -o $@
+
+$(BUILD_DIR)/interrupts.o: $(SRC_DIR)/drivers/interrupts.s
+	$(AS) $(ASFLAGS) $< -o $@
+
+$(BUILD_DIR)/keyboard.o: $(SRC_DIR)/drivers/keyboard.c
 	$(CC) $(CFLAGS) $< -o $@
 
 clean:
