@@ -1,14 +1,14 @@
     ; ============================================================================
     ; LOADER.S - Bootloader do Sistema Operacional
     ; ============================================================================
-    ; Este arquivo implementa o ponto de entrada do kernel seguindo a
-    ; especificação Multiboot, permitindo que o GRUB carregue o SO.
+    ; Este é o PRIMEIRO código executado quando o GRUB carrega o kernel.
+    ; Implementa a especificação Multiboot para ser reconhecido pelo GRUB.
     ; ============================================================================
 
-    global loader                   ; Exporta o símbolo 'loader' como ponto de entrada do ELF
+    global loader                   ; Torna 'loader' visível para o linker (ponto de entrada)
 
     ; ----------------------------------------------------------------------------
-    ; Constantes do Multiboot
+    ; Constantes do Multiboot (Especificação para bootloaders)
     ; ----------------------------------------------------------------------------
     MAGIC_NUMBER equ 0x1BADB002     
     
@@ -22,10 +22,11 @@
     ; ----------------------------------------------------------------------------
     ; Seção BSS - Block Started by Symbol (dados não inicializados)
     ; ----------------------------------------------------------------------------
+    ; Esta seção não ocupa espaço no binário, apenas reserva memória em runtime
     section .bss
-    align 4                         ; Alinha em 4 bytes (requisito de arquitetura x86)
-    kernel_stack:                   ; Label que marca o início da pilha
-        resb KERNEL_STACK_SIZE      ; Reserva 4096 bytes para a pilha do kernel
+    align 4                         ; Alinha em 4 bytes (requisito x86 para performance)
+    kernel_stack:                   ; Label que marca o INÍCIO da pilha
+        resb KERNEL_STACK_SIZE      ; Reserva 4096 bytes de memória não inicializada
 
     ; ----------------------------------------------------------------------------
     ; Seção TEXT - Código executável
@@ -37,19 +38,25 @@
         dd -(MAGIC_NUMBER + FLAGS) ; Cálculo explícito para não ter erro de sinal
                                     ; Estes 3 valores formam o cabeçalho Multiboot
 
+    extern kmain                    ; Declara que kmain() está definida em outro arquivo (C)
+    
     ; ----------------------------------------------------------------------------
     ; Função loader - Ponto de entrada do kernel
     ; ----------------------------------------------------------------------------
-    ; Esta é a primeira função executada quando o GRUB transfere controle
-    ; para o kernel. Ela configura o ambiente básico e entra em loop.
-
-    extern kmain
-    
-    loader:                                         ; Label do loader (definido como entry point no linker)
-        mov esp, kernel_stack + KERNEL_STACK_SIZE   ; Configura ESP para apontar para o topo da pilha
-                                                    ; (pilha cresce para baixo, então ESP aponta para o fim)
+    ; O GRUB salta para cá após carregar o kernel na memória.
+    ; Neste ponto:
+    ; - Estamos em modo protegido 32-bit
+    ; - Paginação está desabilitada
+    ; - Interrupções estão desabilitadas
+    ; - Não há pilha configurada ainda
+    loader:
+        ; Configura a pilha do kernel
+        ; A pilha cresce PARA BAIXO na memória, então ESP deve apontar para o TOPO
+        mov esp, kernel_stack + KERNEL_STACK_SIZE   ; ESP = endereço final da pilha
         
-        call kmain
+        ; Chama a função principal do kernel escrita em C
+        call kmain                  ; Transfere controle para kmain()
 
+        ; Se kmain() retornar (não deveria), entra em loop infinito
     .loop:
-        jmp .loop                   ; Loop infinito - mantém o kernel em execução
+        jmp .loop                   ; Loop infinito para evitar execução de lixo
