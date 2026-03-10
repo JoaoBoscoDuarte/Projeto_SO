@@ -9,15 +9,35 @@
 // Cada caractere ocupa 2 bytes: [caractere][atributo de cor]
 // ============================================================================
 
-// static char *fb = (char *) 0x000B8000;
+// Portas de I/O do controlador VGA para controle do cursor
+#define FB_COMMAND_PORT 0x3D4   // Porta de comando (seleciona registrador)
+#define FB_DATA_PORT    0x3D5   // Porta de dados (lê/escreve valor)
+#define FB_HIGH_BYTE    14      // Registrador: byte alto da posição do cursor
+#define FB_LOW_BYTE     15      // Registrador: byte baixo da posição do cursor
+
+// Ponteiro para a memória de vídeo VGA
+static char *fb = (char *) 0x000B8000;  // Endereço fixo da memória VGA
+
+// Posição atual do cursor (0-1999, onde 0 = canto superior esquerdo)
 static unsigned short cursor_pos = 0;
 
-void fb_clear(void) {
-    unsigned char *mem_vga = (unsigned char *) 0x000B8000;
-    for (int i = 0; i < 80 * 25 * 2; i += 2) {
-        mem_vga[i] = ' ';      // Espaço vazio
-        mem_vga[i+1] = 0x07;   // 0x07 é Cinza Claro no Preto (Legível e padrão)
+// ============================================================================
+// fb_clear - Limpa a tela inteira
+// ============================================================================
+// Preenche toda a tela com espaços em branco com fundo preto
+void fb_clear(void)
+{
+    unsigned int i;
+    // Percorre todas as 2000 células da tela (80x25)
+    for (i = 0; i < 80 * 25; i++) {
+        fb[i * 2] = ' ';        // Byte 0: caractere espaço
+        fb[i * 2 + 1] = ((FB_BLACK & 0x0F) << 4) | (FB_WHITE & 0x0F);
+                                // Byte 1: atributo de cor
+                                // Bits 7-4: cor de fundo (preto)
+                                // Bits 3-0: cor do texto (branco)
     }
+    cursor_pos = 0;             // Reseta cursor para início
+    fb_move_cursor(cursor_pos); // Atualiza cursor no hardware
 }
 
 // ============================================================================
@@ -29,9 +49,10 @@ void fb_clear(void) {
 // bg: cor do fundo (background)
 void fb_write_cell(unsigned int i, char c, unsigned char fg, unsigned char bg)
 {
-    unsigned char *mem_vga = (unsigned char *) 0x000B8000; // Force o ponteiro aqui
-    mem_vga[i * 2] = c;
-    mem_vga[i * 2 + 1] = ((bg & 0x0F) << 4) | (fg & 0x0F);
+    fb[i * 2] = c;              // Escreve o caractere
+    fb[i * 2 + 1] = ((bg & 0x0F) << 4) | (fg & 0x0F);
+                                // Combina cores: fundo nos 4 bits altos,
+                                // texto nos 4 bits baixos
 }
 
 // ============================================================================
@@ -89,20 +110,18 @@ int fb_write(char *buf, unsigned int len)
     return (int)len;
 }
 
-void fb_put_char(unsigned int row, unsigned int col, char c, unsigned char fg, unsigned char bg) {
-    unsigned char *fb = (unsigned char *) 0xB8000;
-    unsigned int index = 2 * (row * 80 + col);
-    fb[index] = c;           // Byte 0: Caractere
-    fb[index + 1] = ((bg & 0x0F) << 4) | (fg & 0x0F); // Byte 1: Cor
-}
-
+// ============================================================================
+// fb_scroll - Rola a tela uma linha para cima
+// ============================================================================
 void fb_scroll(void) {
-    unsigned char *mem_vga = (unsigned char *) 0x000B8000;
-    for (int i = 0; i < 80 * 24 * 2; i++) {
-        mem_vga[i] = mem_vga[i + 80 * 2];
+    unsigned int i;
+    // Move todas as linhas uma posição acima
+    for (i = 0; i < 80 * 24 * 2; i++) {
+        fb[i] = fb[i + 80 * 2];
     }
-    for (int i = 80 * 24 * 2; i < 80 * 25 * 2; i += 2) {
-        mem_vga[i] = ' ';
-        mem_vga[i+1] = 0x07; // Fundo preto
+    // Limpa a última linha
+    for (i = 80 * 24 * 2; i < 80 * 25 * 2; i += 2) {
+        fb[i] = ' ';
+        fb[i+1] = 0x07;
     }
 }
