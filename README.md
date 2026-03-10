@@ -22,7 +22,7 @@ Este projeto utiliza como principal referência o livro "The Little Book About O
 Para instalar todas as dependências necessárias no Ubuntu/Debian:
 
 ```bash
-sudo apt install nasm binutils gcc make grub-legacy genisoimage bochs bochs-x
+sudo apt install nasm binutils gcc make grub-legacy genisoimage bochs bochs-x xorriso
 ```
 
 #### Ferramentas de Compilação
