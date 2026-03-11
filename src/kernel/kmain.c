@@ -4,8 +4,18 @@
 #include "gdt.h"
 #include "pic.h"
 #include "idt.h"
+#include "multiboot.h"
 
-void kmain(void) {
+void kmain(unsigned int ebx) {
+    multiboot_info_t *mbinfo = (multiboot_info_t *) ebx;
+    unsigned int address_of_module = mbinfo->mods_addr;
+
+    unsigned int size_of_module = mbinfo->mods_count;
+    unsigned int flags = mbinfo->flags;
+
+    kprintf(OUTPUT_FB, "\nFlags: 0x%x\n", flags);
+    kprintf(OUTPUT_FB, "Tamanho do modulo: 0x%x\n", size_of_module);
+
     fb_clear(); // Agora a tela começa limpa e preta
     
     gdt_init();
