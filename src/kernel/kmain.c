@@ -25,6 +25,10 @@ void kmain(unsigned int ebx) {
     // 4. Exibe mensagem de inicialização
     log_info("Sistema Operacional Iniciado");
 
+    kprintf(OUTPUT_FB, "bitwise AND result: %d\n", (flags & MULTIBOOT_INFO_MODS) && number_of_modules > 0);
+    kprintf(OUTPUT_FB, "\nFlags: %d\n", flags);
+    kprintf(OUTPUT_FB, "Endereco da lista de modulos: 0x%x\n", (unsigned int) mbinfo->mods_addr);
+    kprintf(OUTPUT_FB, "Numero de modulos: %d\n", number_of_modules);
     // Chama o primeiro módulo carregado pelo GRUB, se existir
     if ((flags & MULTIBOOT_INFO_MODS) && number_of_modules > 0) {
         multiboot_module_t *mods = (multiboot_module_t *) mbinfo->mods_addr;
@@ -41,10 +45,6 @@ void kmain(unsigned int ebx) {
     // 6. Testa kprintf com formatação
     // OUTPUT_FB: envia apenas para framebuffer (tela)
     // %d: formata inteiro decimal
-    kprintf(OUTPUT_FB, "bitwise AND result: %d\n", (flags & MULTIBOOT_INFO_MODS) && number_of_modules > 0);
-    kprintf(OUTPUT_FB, "\nFlags: 0x%x\n", flags);
-    kprintf(OUTPUT_FB, "Endereco da lista de modulos: 0x%x\n", (unsigned int) mbinfo->mods_addr);
-    kprintf(OUTPUT_FB, "Numero de modulos: %d\n", number_of_modules);
     
     // OUTPUT_SERIAL: envia apenas para porta serial
     // %x: formata em hexadecimal
