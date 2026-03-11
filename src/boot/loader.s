@@ -11,10 +11,9 @@
     ; Constantes do Multiboot (Especificação para bootloaders)
     ; ----------------------------------------------------------------------------
     MAGIC_NUMBER equ 0x1BADB002     
-    ALIGN_MODULES equ 0x00000001
     
-    ; FLAGS: Bit 0 (alinhamento) + Bit 1 (info de memória)
-    ; Isso garante que o GRUB configure a máquina de forma mais estável.
+    ; FLAGS: Bit 0 (page align) + Bit 1 (memory info)
+    ; Bit 0 = MULTIBOOT_PAGE_ALIGN: kernel e módulos alinhados em 4KB
     FLAGS        equ 0x00000003     
     
     CHECKSUM     equ -(MAGIC_NUMBER + FLAGS)  
@@ -37,8 +36,7 @@
         dd MAGIC_NUMBER             ; Escreve o número mágico no binário
         dd FLAGS                    ; Escreve as flags
         dd -(MAGIC_NUMBER + FLAGS) ; Cálculo explícito para não ter erro de sinal
-                                    ; Estes 3 valores formam o cabeçalho Multiboot
-        dd ALIGN_MODULES            ; Escreve a instrução de alinhamento de módulos
+                                    ; Estes 3 dwords (12 bytes) formam o cabeçalho Multiboot
 
     extern kmain                    ; Declara que kmain() está definida em outro arquivo (C)
     
