@@ -12,8 +12,8 @@
     ; ----------------------------------------------------------------------------
     MAGIC_NUMBER equ 0x1BADB002     
     
-    ; FLAGS: Bit 0 (alinhamento) + Bit 1 (info de memória)
-    ; Isso garante que o GRUB configure a máquina de forma mais estável.
+    ; FLAGS: Bit 0 (page align) + Bit 1 (memory info)
+    ; Bit 0 = MULTIBOOT_PAGE_ALIGN: kernel e módulos alinhados em 4KB
     FLAGS        equ 0x00000003     
     
     CHECKSUM     equ -(MAGIC_NUMBER + FLAGS)  
@@ -31,12 +31,12 @@
     ; ----------------------------------------------------------------------------
     ; Seção TEXT - Código executável
     ; ----------------------------------------------------------------------------
-    section .multiboot                   ; Início da seção de código
+    section .multiboot              ; Início da seção de código
     align 4                         ; Código deve estar alinhado em 4 bytes
         dd MAGIC_NUMBER             ; Escreve o número mágico no binário
         dd FLAGS                    ; Escreve as flags
         dd -(MAGIC_NUMBER + FLAGS) ; Cálculo explícito para não ter erro de sinal
-                                    ; Estes 3 valores formam o cabeçalho Multiboot
+                                    ; Estes 3 dwords (12 bytes) formam o cabeçalho Multiboot
 
     extern kmain                    ; Declara que kmain() está definida em outro arquivo (C)
     
@@ -54,8 +54,11 @@
         ; A pilha cresce PARA BAIXO na memória, então ESP deve apontar para o TOPO
         mov esp, kernel_stack + KERNEL_STACK_SIZE   ; ESP = endereço final da pilha
         
-        ; Chama a função principal do kernel escrita em C
-        call kmain                  ; Transfere controle para kmain()
+        ; Passa o endereço da estrutura multiboot para kmain (cdecl: 1º arg na pilha)
+        ; O GRUB deixa em EBX o endereço físico de multiboot_info ao pular para o kernel
+        push ebx
+        call kmain                  ; Transfere controle para kmain(unsigned int multiboot_info)
+        add esp, 4                  ; Caller limpa o argumento (cdecl)
 
         ; Se kmain() retornar (não deveria), entra em loop infinito
     .loop:

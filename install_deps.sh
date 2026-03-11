@@ -2,7 +2,7 @@
 # Script para instalar dependências do projeto
 
 echo "Instalando dependências..."
-sudo apt install -y grub-legacy genisoimage bochs bochs-x nasm binutils gcc make
+sudo apt install -y grub-legacy genisoimage bochs bochs-x nasm binutils gcc make xorriso
 
 echo ""
 echo "Copiando stage2_eltorito do GRUB..."

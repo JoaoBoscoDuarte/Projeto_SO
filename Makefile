@@ -32,16 +32,21 @@ OBJECTS = $(BUILD_DIR)/loader.o \
 
 all: kernel.elf
 
+# Módulo carregado pelo GRUB (binário plano para Multiboot)
+MODULE_PROGRAM = $(BUILD_DIR)/program
 kernel.elf: $(BUILD_DIR) $(OBJECTS)
 	$(LD) $(LDFLAGS) $(OBJECTS) -o kernel.elf
 
-os.iso: kernel.elf
+os.iso: kernel.elf $(MODULE_PROGRAM)
 	@mkdir -p $(ISO_DIR)/boot/grub
+	@mkdir -p $(ISO_DIR)/modules
 	cp kernel.elf $(ISO_DIR)/boot/kernel.elf
+	cp $(MODULE_PROGRAM) $(ISO_DIR)/modules/program
 	echo 'set timeout=0' > $(ISO_DIR)/boot/grub/grub.cfg
 	echo 'set default=0' >> $(ISO_DIR)/boot/grub/grub.cfg
 	echo 'menuentry "os" {' >> $(ISO_DIR)/boot/grub/grub.cfg
 	echo '  multiboot /boot/kernel.elf' >> $(ISO_DIR)/boot/grub/grub.cfg
+	echo '  module /modules/program' >> $(ISO_DIR)/boot/grub/grub.cfg
 	echo '}' >> $(ISO_DIR)/boot/grub/grub.cfg
 	grub-mkrescue -o os.iso $(ISO_DIR)
 
@@ -89,6 +94,10 @@ $(BUILD_DIR)/interrupts.o: $(SRC_DIR)/drivers/interrupts.s
 
 $(BUILD_DIR)/keyboard.o: $(SRC_DIR)/drivers/keyboard.c
 	$(CC) $(CFLAGS) $< -o $@
+
+# Módulo program: binário plano para o GRUB carregar como Multiboot module
+$(MODULE_PROGRAM): program.s | $(BUILD_DIR)
+	$(AS) -f bin $< -o $@
 
 clean:
 	rm -rf $(BUILD_DIR) kernel.elf os.iso

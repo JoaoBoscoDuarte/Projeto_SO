@@ -31,10 +31,10 @@ void fb_clear(void)
     // Percorre todas as 2000 células da tela (80x25)
     for (i = 0; i < 80 * 25; i++) {
         fb[i * 2] = ' ';        // Byte 0: caractere espaço
-        fb[i * 2 + 1] = ((FB_BLACK & 0x0F) << 4) | (FB_WHITE & 0x0F);
+        fb[i * 2 + 1] = ((FB_BLACK & 0x0F) << 4) | (FB_LIGHT_GREY & 0x0F);
                                 // Byte 1: atributo de cor
                                 // Bits 7-4: cor de fundo (preto)
-                                // Bits 3-0: cor do texto (branco)
+                                // Bits 3-0: cor do texto (cinza claro)
     }
     cursor_pos = 0;             // Reseta cursor para início
     fb_move_cursor(cursor_pos); // Atualiza cursor no hardware
@@ -94,7 +94,7 @@ int fb_write(char *buf, unsigned int len)
             
         } else {
             // Caractere normal: escreve e avança cursor
-            fb_write_cell(cursor_pos, buf[i], FB_WHITE, FB_BLACK);
+            fb_write_cell(cursor_pos, buf[i], FB_LIGHT_GREY, FB_BLACK);
             cursor_pos++;
         }
         
