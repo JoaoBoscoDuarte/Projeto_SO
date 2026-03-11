@@ -17,7 +17,7 @@ void kmain(unsigned int ebx) {
 
     kprintf(OUTPUT_FB, "\nFlags: 0x%x\n", flags);
     kprintf(OUTPUT_FB, "Endereco do modulo: 0x%x\n", address_of_module);
-    kprintf(OUTPUT_FB, "Tamanho do modulo: 0x%x\n", number_of_modules);
+    kprintf(OUTPUT_FB, "Numero de modulos: %u\n", number_of_modules);
     
     gdt_init();
     serial_init();
