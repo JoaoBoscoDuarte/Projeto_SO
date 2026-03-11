@@ -14,9 +14,10 @@ void kmain(unsigned int ebx) {
     unsigned int flags = mbinfo->flags;
     
     fb_clear(); // Agora a tela começa limpa e preta
-    
+
     kprintf(OUTPUT_FB, "\nFlags: 0x%x\n", flags);
-    kprintf(OUTPUT_FB, "Tamanho do modulo: 0x%x\n", size_of_module);
+    kprintf(OUTPUT_FB, "Endereco do modulo: 0x%x\n", address_of_module);
+    kprintf(OUTPUT_FB, "Tamanho do modulo: 0x%x\n", number_of_modules);
     
     gdt_init();
     serial_init();
