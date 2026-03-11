@@ -54,8 +54,11 @@
         ; A pilha cresce PARA BAIXO na memória, então ESP deve apontar para o TOPO
         mov esp, kernel_stack + KERNEL_STACK_SIZE   ; ESP = endereço final da pilha
         
-        ; Chama a função principal do kernel escrita em C
-        call kmain                  ; Transfere controle para kmain()
+        ; Passa o endereço da estrutura multiboot para kmain (cdecl: 1º arg na pilha)
+        ; O GRUB deixa em EBX o endereço físico de multiboot_info ao pular para o kernel
+        push ebx
+        call kmain                  ; Transfere controle para kmain(unsigned int multiboot_info)
+        add esp, 4                  ; Caller limpa o argumento (cdecl)
 
         ; Se kmain() retornar (não deveria), entra em loop infinito
     .loop:
