@@ -43,7 +43,7 @@ void kmain(unsigned int ebx) {
     // %d: formata inteiro decimal
     kprintf(OUTPUT_FB, "\nFlags: 0x%x\n", flags);
     kprintf(OUTPUT_FB, "Endereco da lista de modulos: 0x%x\n", (unsigned int) mbinfo->mods_addr);
-    kprintf(OUTPUT_FB, "Numero de modulos: %u\n", number_of_modules);
+    kprintf(OUTPUT_FB, "Numero de modulos: %d\n", number_of_modules);
     
     // OUTPUT_SERIAL: envia apenas para porta serial
     // %x: formata em hexadecimal
