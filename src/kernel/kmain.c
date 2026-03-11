@@ -30,14 +30,14 @@ void kmain(unsigned int ebx) {
     kprintf(OUTPUT_FB, "Endereco da lista de modulos: 0x%x\n", (unsigned int) mbinfo->mods_addr);
     kprintf(OUTPUT_FB, "Numero de modulos: %d\n", number_of_modules);
     // Chama o primeiro módulo carregado pelo GRUB, se existir
-    if ((flags & MULTIBOOT_INFO_MODS) && number_of_modules > 0) {
-        kprintf(OUTPUT_FB, "Carregando modulo...\n");
-        multiboot_module_t *mods = (multiboot_module_t *) mbinfo->mods_addr;
-        unsigned int module_entry = mods[0].mod_start;  /* início do código do módulo = ponto de entrada */
-        call_module_t start_program = (call_module_t) module_entry;
-        start_program();
-        /* só chegamos aqui se o módulo retornar (ex.: program.s faz jmp $ e não retorna) */
-    }
+
+    kprintf(OUTPUT_FB, "Carregando modulo...\n");
+    multiboot_module_t *mods = (multiboot_module_t *) mbinfo->mods_addr;
+    unsigned int module_entry = mods[0].mod_start;  /* início do código do módulo = ponto de entrada */
+    call_module_t start_program = (call_module_t) module_entry;
+    start_program();
+    /* só chegamos aqui se o módulo retornar (ex.: program.s faz jmp $ e não retorna) */
+
 
     // 5. Log de debug (apenas serial, não aparece na tela)
     // Útil para debug sem poluir a tela
