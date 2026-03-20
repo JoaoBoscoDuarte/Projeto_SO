@@ -1,0 +1,32 @@
+name: Compile
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '*.md'
+
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - '*.md'
+
+jobs:
+  compile-test:
+    name: Compile Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: ./install_deps.sh
+      
+      - name: Compile
+        run: make os.iso
+
+      - name: Clean
+        run: make clean
+    
