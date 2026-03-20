@@ -11,8 +11,7 @@ Execute o script de instalação:
 Ou instale manualmente:
 
 ```bash
-sudo apt install grub-legacy genisoimage bochs bochs-x nasm binutils gcc make
-sudo cp /usr/lib/grub/i386-pc/stage2_eltorito iso/boot/grub/
+sudo apt install genisoimage bochs bochs-x nasm binutils gcc make
 ```
 
 ## 2. Compilar e Executar
