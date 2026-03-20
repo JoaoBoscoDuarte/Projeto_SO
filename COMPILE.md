@@ -11,7 +11,7 @@ Execute o script de instalação:
 Ou instale manualmente:
 
 ```bash
-sudo apt install genisoimage bochs bochs-x nasm binutils gcc make
+sudo apt install genisoimage bochs bochs-x nasm binutils gcc make mtools
 ```
 
 ## 2. Compilar e Executar
