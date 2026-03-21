@@ -61,52 +61,36 @@
     extern kernel_physical_start
     extern kernel_physical_end
 
-    ; ----------------------------------------------------------------------------
-    ; Função loader - Ponto de entrada do kernel
-    ; ----------------------------------------------------------------------------
-    ; O GRUB salta para cá após carregar o kernel na memória.
-    ; Neste ponto:
-    ; - Estamos em modo protegido 32-bit
-    ; - Paginação está desabilitada         ← ainda verdade AO ENTRAR em loader
-    ; - Interrupções estão desabilitadas
-    ; - Não há pilha configurada ainda
+    section .text
     loader:
-        
+        ; salva ebx (endereço do multiboot) antes de qualquer uso de ebx
+        mov edi, ebx
+
         ; --- Ativa identity paging (4 MB pages) ---
-        ; Carrea o endereço físico do page directory em cr3. 
-        ; O MMU usa cr3 para saber onde está o PDT. Como ainda não há paging ativo, o endereço de page_directory já é físico.
         mov eax, page_directory
         mov cr3, eax
 
-        ; Lê cr4, seta o bit 4 (PSE — Page Size Extensions) e escreve de volta.
-        ; Sem isso, o bit PS nas entradas do PDT é ignorado e o hardware tentaria usar page tables de 4 KB, o que quebraria tudo
         mov eax, cr4
         or  eax, 0x00000010    ; PSE bit
         mov cr4, eax
 
-        ; Lê cr0, seta o bit 31 (PG — Paging Enable) e escreve de volta. Este é o momento exato em que o paging é ligado. 
-        ; A partir da próxima instrução, todo acesso à memória passa pelo MMU.
         mov eax, cr0
         or  eax, 0x80000000    ; PG bit
         mov cr0, eax
         ; A partir daqui: paginação ativa, virtual == físico
 
-        ; --- Configura pilha ---
-        ; A pilha cresce PARA BAIXO na memória, então ESP deve apontar para o TOPO
-        mov esp, kernel_stack + KERNEL_STACK_SIZE   ; ESP = endereço final da pilha
-        ; A partir daqui: pilha disponível
+        ; configura pilha
+        mov esp, kernel_stack + KERNEL_STACK_SIZE
 
-        ; Empurrando os módulo externos na pilha antes do call main
+        ; empurra argumentos para kmain
         push kernel_physical_end
         push kernel_physical_start
         push kernel_virtual_end
         push kernel_virtual_start
-        push ebx                    ; primeiro argumento = multiboot_info
+        push edi                    ; multiboot_addr
 
+        call kmain
+        add esp, 20
 
-        call kmain                  ; Transfere controle para kmain(unsigned int multiboot_info)
-        add esp, 20                 ; Limpa 5 argumentos (5 * 4 bytes)
-
-        ; Se kmain() retornar (não deveria), entra em loop infinito
     .loop:
-        jmp .loop                   ; Loop infinito para evitar execução de lixo
+        jmp .loop

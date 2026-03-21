@@ -1,4 +1,4 @@
-ENTRY(loader)           /* the name of the entry symbol */
+ENTRY(loader)
 
 SECTIONS
 {
