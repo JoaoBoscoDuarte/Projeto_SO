@@ -38,6 +38,22 @@
         dd -(MAGIC_NUMBER + FLAGS) ; Cálculo explícito para não ter erro de sinal
                                     ; Estes 3 dwords (12 bytes) formam o cabeçalho Multiboot
 
+    
+    ; ----------------------------------------------------------------------------
+    ; Seção DATA - Page directory alinhado em 4096 bytes
+    ; ----------------------------------------------------------------------------
+    section .data
+    align 4096
+    page_directory:
+        ; 1024 entradas, cada uma mapeando um frame de 4 MB
+        ; Bits: PS=1 (4MB page), RW=1, P=1 → 0x83
+        ; Entrada i aponta para endereço físico i * 0x400000
+        %assign i 0
+        %rep 1024
+            dd (i * 0x400000) | 0x83   ; presente + leitura/escrita + 4MB page
+            %assign i i+1
+        %endrep
+
     extern kmain                    ; Declara que kmain() está definida em outro arquivo (C)
     
     ; ----------------------------------------------------------------------------
@@ -46,13 +62,34 @@
     ; O GRUB salta para cá após carregar o kernel na memória.
     ; Neste ponto:
     ; - Estamos em modo protegido 32-bit
-    ; - Paginação está desabilitada
+    ; - Paginação está desabilitada         ← ainda verdade AO ENTRAR em loader
     ; - Interrupções estão desabilitadas
     ; - Não há pilha configurada ainda
     loader:
-        ; Configura a pilha do kernel
+        
+        ; --- Ativa identity paging (4 MB pages) ---
+        ; Carrea o endereço físico do page directory em cr3. 
+        ; O MMU usa cr3 para saber onde está o PDT. Como ainda não há paging ativo, o endereço de page_directory já é físico.
+        mov eax, page_directory
+        mov cr3, eax
+
+        ; Lê cr4, seta o bit 4 (PSE — Page Size Extensions) e escreve de volta.
+        ; Sem isso, o bit PS nas entradas do PDT é ignorado e o hardware tentaria usar page tables de 4 KB, o que quebraria tudo
+        mov eax, cr4
+        or  eax, 0x00000010    ; PSE bit
+        mov cr4, eax
+
+        ; Lê cr0, seta o bit 31 (PG — Paging Enable) e escreve de volta. Este é o momento exato em que o paging é ligado. 
+        ; A partir da próxima instrução, todo acesso à memória passa pelo MMU.
+        mov eax, cr0
+        or  eax, 0x80000000    ; PG bit
+        mov cr0, eax
+        ; A partir daqui: paginação ativa, virtual == físico
+
+        ; --- Configura pilha ---
         ; A pilha cresce PARA BAIXO na memória, então ESP deve apontar para o TOPO
         mov esp, kernel_stack + KERNEL_STACK_SIZE   ; ESP = endereço final da pilha
+        ; A partir daqui: pilha disponível
         
         ; Passa o endereço da estrutura multiboot para kmain (cdecl: 1º arg na pilha)
         ; O GRUB deixa em EBX o endereço físico de multiboot_info ao pular para o kernel
