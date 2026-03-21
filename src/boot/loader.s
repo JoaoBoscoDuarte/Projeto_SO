@@ -45,16 +45,19 @@
     section .data
     align 4096
     page_directory:
-        ; 1024 entradas, cada uma mapeando um frame de 4 MB
-        ; Bits: PS=1 (4MB page), RW=1, P=1 → 0x83
-        ; Entrada i aponta para endereço físico i * 0x400000
-        %assign i 0
-        %rep 1024
-            dd (i * 0x400000) | 0x83   ; presente + leitura/escrita + 4MB page
-            %assign i i+1
-        %endrep
+        ; Entrada 0: Identity mapping temporário (Virtual 0x0 -> Físico 0x0)
+        dd 0x00000083
+        
+        ; Entradas 1 a 767: Vazias
+        times (768 - 1) dd 0
+        
+        ; Entrada 768: Higher-half mapping (Virtual 0xC0000000 -> Físico 0x0)
+        ; Isso mapeia a faixa 3GB~3GB+4MB para a física 0~4MB
+        dd 0x00000083
+        
+        ; Entradas 769 a 1023: Vazias
+        times (1024 - 768 - 1) dd 0
 
-    ; Declara os módulos externos
     extern kmain                  
     extern kernel_virtual_start
     extern kernel_virtual_end
@@ -63,11 +66,12 @@
 
     section .text
     loader:
-        ; salva ebx (endereço do multiboot) antes de qualquer uso de ebx
+        ; Transforma o endereço do multiboot em VIRTUAL adicionando 3GB
         mov edi, ebx
+        add edi, 0xC0000000
 
-        ; --- Ativa identity paging (4 MB pages) ---
-        mov eax, page_directory
+        ; Subtrai 3GB do endereço do page_directory para achar o endereço FÍSICO dele
+        mov eax, page_directory - 0xC0000000
         mov cr3, eax
 
         mov eax, cr4
@@ -77,7 +81,19 @@
         mov eax, cr0
         or  eax, 0x80000000    ; PG bit
         mov cr0, eax
-        ; A partir daqui: paginação ativa, virtual == físico
+
+        ; === O GRANDE SALTO ===
+        ; Até agora, o EIP (ponteiro de instrução) está no endereço físico baixo (1MB).
+        ; Ao saltarmos para uma label absoluta, forçamos o EIP a pular para o endereço 
+        ; virtual (3GB) gerado pelo linker.
+        lea eax, .higher_half
+        jmp eax
+
+    .higher_half:
+        ; Agora estamos rodando a 3GB de altura! O mapeamento temporário (identity) 
+        ; não é mais necessário. Desmapeamos a página 0 e limpamos o TLB por segurança.
+        mov dword [page_directory - 0xC0000000], 0
+        invlpg [0]
 
         ; configura pilha
         mov esp, kernel_stack + KERNEL_STACK_SIZE
@@ -87,7 +103,7 @@
         push kernel_physical_start
         push kernel_virtual_end
         push kernel_virtual_start
-        push edi                    ; multiboot_addr
+        push edi                    ; multiboot_addr virtualizado
 
         call kmain
         add esp, 20
