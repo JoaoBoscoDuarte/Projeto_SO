@@ -1,10 +1,17 @@
-ENTRY(loader)
+ENTRY(loader)           /* the name of the entry symbol */
 
-SECTIONS {
+SECTIONS
+{
     . = 0x00100000;
 
-    .text ALIGN (0x1000) : {
+    kernel_virtual_start = .;
+    kernel_physical_start = .;
+
+    .multiboot ALIGN (0x4) : {
         *(.multiboot)
+    }
+
+    .text ALIGN (0x1000) : {
         *(.text)
         *(.text*)
     }
@@ -24,4 +31,7 @@ SECTIONS {
         *(.bss)
         *(.bss*)
     }
+
+    kernel_virtual_end = .;
+    kernel_physical_end = .;
 }

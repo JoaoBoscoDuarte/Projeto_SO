@@ -54,8 +54,13 @@
             %assign i i+1
         %endrep
 
-    extern kmain                    ; Declara que kmain() está definida em outro arquivo (C)
-    
+    ; Declara os módulos externos
+    extern kmain                  
+    extern kernel_virtual_start
+    extern kernel_virtual_end
+    extern kernel_physical_start
+    extern kernel_physical_end
+
     ; ----------------------------------------------------------------------------
     ; Função loader - Ponto de entrada do kernel
     ; ----------------------------------------------------------------------------
@@ -90,12 +95,17 @@
         ; A pilha cresce PARA BAIXO na memória, então ESP deve apontar para o TOPO
         mov esp, kernel_stack + KERNEL_STACK_SIZE   ; ESP = endereço final da pilha
         ; A partir daqui: pilha disponível
-        
-        ; Passa o endereço da estrutura multiboot para kmain (cdecl: 1º arg na pilha)
-        ; O GRUB deixa em EBX o endereço físico de multiboot_info ao pular para o kernel
-        push ebx
+
+        ; Empurrando os módulo externos na pilha antes do call main
+        push kernel_physical_end
+        push kernel_physical_start
+        push kernel_virtual_end
+        push kernel_virtual_start
+        push ebx                    ; primeiro argumento = multiboot_info
+
+
         call kmain                  ; Transfere controle para kmain(unsigned int multiboot_info)
-        add esp, 4                  ; Caller limpa o argumento (cdecl)
+        add esp, 20                 ; Limpa 5 argumentos (5 * 4 bytes)
 
         ; Se kmain() retornar (não deveria), entra em loop infinito
     .loop:
