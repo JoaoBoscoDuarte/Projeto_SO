@@ -1,0 +1,536 @@
+# Higher-Half Kernel e Paginação Avançada
+
+Este documento descreve a implementação do higher-half kernel, a migração de PSE para page tables reais de 4 KB, e o mecanismo de mapeamento temporário de frames (Capítulo 10.2 do livro).
+
+Ele continua diretamente de onde o documento `06-paging-e-pfa.md` parou.
+
+---
+
+## 1. Higher-Half Kernel
+
+### O que é
+
+O higher-half kernel é uma técnica que move o kernel para um endereço virtual alto — neste projeto, `0xC0100000` (3 GB + 1 MB) — enquanto ele continua carregado fisicamente em `0x00100000`.
+
+A divisão resulta no seguinte layout do espaço virtual de 4 GB:
+
+```
+0x00000000 – 0xBFFFFFFF  →  3 GB para processos de usuário (futuro)
+0xC0000000 – 0xFFFFFFFF  →  1 GB reservado para o kernel
+```
+
+### Por que é necessário
+
+Com identity paging, o kernel ocupa endereços virtuais baixos (`0x100000`). Isso significa que processos de usuário não podem usar essa região — ela está tomada pelo kernel. Mover o kernel para o topo libera os 3 GB inferiores inteiros para user space.
+
+Além disso, separa claramente código de kernel de código de usuário: uma tentativa de user mode acessar `0xC0000000+` pode ser bloqueada por flags nas page tables.
+
+### A diferença entre VMA e LMA
+
+O linker trabalha com dois conceitos de endereço:
+
+- **VMA (Virtual Memory Address)**: onde o código *acha* que está — os endereços que aparecem nos ponteiros e saltos gerados pelo compilador.
+- **LMA (Load Memory Address)**: onde o GRUB *realmente* coloca o binário na memória física.
+
+No higher-half, esses dois valores são diferentes:
+
+```
+VMA = 0xC0100000   (o kernel pensa que está aqui)
+LMA = 0x00100000   (o GRUB carrega aqui)
+```
+
+A diferença entre os dois é sempre `0xC0000000` (3 GB).
+
+---
+
+## 2. Mudanças no Linker Script (`link.ld`)
+
+O linker script precisa comunicar ao compilador que os símbolos vivem em `0xC0100000`, mas instruir o GRUB a gravar o binário em `0x00100000`.
+
+### Separando VMA de LMA com `AT()`
+
+A diretiva `AT()` define o endereço físico de carga de cada seção independente do endereço virtual:
+
+```ld
+KERNEL_VIRT_BASE = 0xC0000000;
+
+SECTIONS {
+    . = 0xC0100000;               /* VMA: onde o kernel se enxerga */
+
+    kernel_virtual_start  = .;
+    kernel_physical_start = . - KERNEL_VIRT_BASE;   /* = 0x00100000 */
+
+    .multiboot ALIGN(4) : AT(ADDR(.multiboot) - KERNEL_VIRT_BASE) {
+        *(.multiboot)
+    }
+
+    .text ALIGN(0x1000) : AT(ADDR(.text) - KERNEL_VIRT_BASE) {
+        *(.text) *(.text*)
+    }
+
+    .rodata ALIGN(0x1000) : AT(ADDR(.rodata) - KERNEL_VIRT_BASE) {
+        *(.rodata) *(.rodata*)
+    }
+
+    .data ALIGN(0x1000) : AT(ADDR(.data) - KERNEL_VIRT_BASE) {
+        *(.data) *(.data*)
+    }
+
+    .bss ALIGN(0x1000) : AT(ADDR(.bss) - KERNEL_VIRT_BASE) {
+        *(COMMON) *(.bss) *(.bss*)
+    }
+
+    kernel_virtual_end  = .;
+    kernel_physical_end = . - KERNEL_VIRT_BASE;
+}
+```
+
+### Por que `.multiboot` vem primeiro
+
+O GRUB procura o cabeçalho Multiboot nos primeiros 8 KB do binário. Com o higher-half, a seção `.text` começa em `0xC0100000`, mas precisa ser carregada fisicamente em `0x00100000`. Colocar `.multiboot` antes de `.text` garante que o cabeçalho esteja no início do arquivo independente de reordenações do linker.
+
+### O que `kernel_physical_start` realmente é
+
+```ld
+kernel_physical_start = . - 0xC0000000;
+```
+
+O linker avalia isso como aritmética pura no momento do link. Quando `. = 0xC0100000`, o resultado é `0x00100000` — um valor numérico, não um endereço. Em C, ao fazer `&kernel_physical_start`, você obtém `0x00100000` como esperado.
+
+---
+
+## 3. Mudanças no Loader (`loader.s`)
+
+O `loader.s` executa **antes** da paginação estar ativa, fisicamente em `0x00100000`. Ele precisa configurar o page directory, ligar o paging, e saltar para o endereço virtual alto — tudo sem ter um sistema de memória virtual ainda funcionando.
+
+### Page directory no bootstrap
+
+Dois mapeamentos são necessários antes de ligar o paging:
+
+```nasm
+section .data
+align 4096
+page_directory:
+    ; Entrada 0: identity map temporário (virtual 0x0 → físico 0x0, 4 MB)
+    ; Necessário para continuar executando após ligar o PG,
+    ; pois o EIP ainda está em 0x001xxxxx (endereço físico baixo)
+    dd 0x00000083
+
+    ; Entradas 1 a 767: não mapeadas
+    times (768 - 1) dd 0
+
+    ; Entrada 768: higher-half (virtual 0xC0000000 → físico 0x0, 4 MB)
+    ; 768 = 0xC0000000 >> 22
+    dd 0x00000083
+
+    ; Entradas 769 a 1023: não mapeadas
+    times (1024 - 768 - 1) dd 0
+```
+
+O valor `0x83 = PS(bit7) | R/W(bit1) | Present(bit0)` cria páginas de 4 MB (PSE).
+
+### Por que dois mapeamentos?
+
+Ao executar `mov cr0, eax` (ligando o PG), o processador **imediatamente** começa a traduzir endereços. Neste momento o EIP aponta para algo como `0x00101xxx` — um endereço físico baixo. Sem a entrada 0, a próxima instrução causaria page fault.
+
+O identity map (entrada 0) cobre essa janela de transição. Ele é removido logo após o salto para o higher-half.
+
+### Carregando CR3 com o endereço físico
+
+O linker atribui ao símbolo `page_directory` o endereço **virtual** `0xC01xxxxx`. Mas CR3 precisa do endereço **físico**, pois a MMU ainda não existe:
+
+```nasm
+mov eax, page_directory - 0xC0000000   ; converte VMA → físico
+mov cr3, eax
+```
+
+### Sequência completa de ativação
+
+```nasm
+loader:
+    mov edi, ebx                        ; salva multiboot_info (físico)
+
+    mov eax, page_directory - 0xC0000000
+    mov cr3, eax                        ; CR3 = endereço físico do PD
+
+    mov eax, cr4
+    or  eax, 0x00000010                 ; CR4.PSE = 1 (páginas de 4 MB)
+    mov cr4, eax
+
+    mov eax, cr0
+    or  eax, 0x80000000                 ; CR0.PG = 1 (paginação ativa)
+    mov cr0, eax
+
+    ; A partir daqui: MMU ativa, EIP ainda em 0x001xxxxx (coberto pela entrada 0)
+
+    lea eax, [.higher_half]             ; carrega o ENDEREÇO VIRTUAL da label
+    jmp eax                             ; salta para 0xC010xxxx
+```
+
+### Por que `lea eax` e não `jmp .higher_half` direto
+
+Um `jmp label` direto em assembly gera um **offset relativo** — não um endereço absoluto. O processador somaria esse offset ao EIP atual (que está em torno de `0x00100xxx`) e saltaria para um endereço baixo, não para `0xC010xxxx`.
+
+O `lea eax, [.higher_half]` força o assembler a usar o endereço **absoluto** que o linker atribuiu à label (o VMA `0xC010xxxx`). O `jmp eax` então salta para esse endereço virtual, que é coberto pela entrada 768 do PD.
+
+### Removendo o identity map e limpando o TLB
+
+```nasm
+.higher_half:
+    ; Agora executando em 0xC010xxxx
+    ; Entrada 0 não é mais necessária
+
+    mov dword [page_directory], 0       ; remove entry 0 (acessa por VMA)
+
+    ; Flush COMPLETO do TLB via reload de CR3
+    ; IMPORTANTE: invlpg [0] NÃO é suficiente para páginas PSE de 4 MB.
+    ; O reload de CR3 invalida todas as entradas do TLB sem exceção.
+    mov eax, cr3
+    mov cr3, eax
+
+    mov esp, kernel_stack + KERNEL_STACK_SIZE   ; stack em endereço virtual
+
+    push kernel_physical_end
+    push kernel_physical_start
+    push kernel_virtual_end
+    push kernel_virtual_start
+    push edi                            ; multiboot_addr (físico original)
+    call kmain
+```
+
+### Por que `invlpg [0]` não é suficiente
+
+`invlpg` invalida a entrada do TLB para uma única página de 4 KB. Com CR4.PSE ativo, a entrada 0 do page directory mapeia 4 MB inteiros usando uma "large page". Processadores x86 não garantem que `invlpg` invalide entradas PSE em todas as implementações. O reload de CR3 é a única forma segura de garantir o flush completo.
+
+---
+
+## 4. Regra de Ouro — Endereços no Higher-Half
+
+Após entrar no higher-half e remover o identity map, **qualquer endereço físico recebido do GRUB precisa ser convertido para virtual** antes de ser derreferenciado como ponteiro em C.
+
+A conversão é sempre:
+```
+endereço_virtual = endereço_físico + 0xC0000000
+```
+
+Isso funciona porque a entrada 768 do PD mapeia:
+```
+virtual 0xC0000000–0xC03FFFFF  →  físico 0x00000000–0x003FFFFF
+```
+
+Ou seja, qualquer endereço físico nos primeiros 4 MB tem um endereço virtual correspondente somando `0xC0000000`.
+
+### Endereços afetados em `kmain.c`
+
+```c
+// multiboot_addr é físico — converte antes de qualquer acesso
+multiboot_info_t *mbinfo =
+    (multiboot_info_t *)(multiboot_addr + 0xC0000000u);
+
+// mbinfo->mods_addr é um campo físico dentro da struct
+multiboot_module_t *mods =
+    (multiboot_module_t *)(mbinfo->mods_addr + 0xC0000000u);
+
+// mods[0].mod_start é o endereço físico do código do módulo
+unsigned int module_virt = mods[0].mod_start + 0xC0000000u;
+call_module_t start_program = (call_module_t) module_virt;
+```
+
+### Endereços afetados em `pfa.c`
+
+Os campos `mmap_addr` e `mods_addr` dentro da struct `multiboot_info_t` são preenchidos pelo GRUB com endereços físicos:
+
+```c
+// mmap_addr aponta para a lista de regiões de memória — endereço físico
+multiboot_memory_map_t *mmap =
+    (multiboot_memory_map_t *)(mbinfo->mmap_addr + 0xC0000000u);
+
+// mods_addr aponta para o array de módulos — endereço físico
+multiboot_module_t *mods =
+    (multiboot_module_t *)(mbinfo->mods_addr + 0xC0000000u);
+```
+
+---
+
+## 5. Migração de PSE para Page Tables de 4 KB (`paging_init`)
+
+O bootstrap usa PSE (páginas de 4 MB) por simplicidade. Assim que `kmain` é chamado, `paging_init()` substitui esse mapeamento por page tables reais de 4 KB.
+
+### Por que migrar
+
+- PSE mapeia blocos de 4 MB inteiros — não é possível mapear ou desmapar páginas individuais
+- O mapeamento temporário de frames (Seção 6) precisa de controle granular por página
+- Capítulos futuros (heap do kernel, user mode) dependem de 4 KB por página
+
+### Estrutura após a migração
+
+```
+Page Directory (1024 entradas, 4096 bytes)
+  Entrada 768 → kernel_pt (1024 entradas, 4096 bytes)
+                  Cada entrada cobre 4 KB
+                  1024 × 4 KB = 4 MB no total
+                  Cobre: 0xC0000000–0xC03FFFFF
+
+  Entrada 769 → temp_pt (1024 entradas, 4096 bytes)
+                  Todas as entradas zeradas inicialmente
+                  Cobre: 0xC0400000–0xC07FFFFF
+                  Entrada 1023 → slot de mapeamento temporário (0xC07FF000)
+```
+
+### Implementação de `paging_init()`
+
+```c
+static pte_t kernel_pt[1024] __attribute__((aligned(4096)));
+static pte_t temp_pt[1024]   __attribute__((aligned(4096)));
+
+void paging_init(void)
+{
+    // 1. Zera as duas page tables
+    for (int i = 0; i < 1024; i++) {
+        kernel_pt[i] = 0;
+        temp_pt[i]   = 0;
+    }
+
+    // 2. Popula kernel_pt: mapeia os primeiros 4 MB
+    //    virtual 0xC0000000 + i*4096 → físico i*4096
+    for (int i = 0; i < 1024; i++) {
+        kernel_pt[i] = (i * PAGE_SIZE) | PAGE_KERNEL;
+    }
+
+    // 3. Instala kernel_pt na entrada 768 do PD (SEM bit PSE)
+    page_directory[768] = VIRT_TO_PHYS(kernel_pt) | PAGE_KERNEL;
+
+    // 4. Instala temp_pt na entrada 769
+    page_directory[769] = VIRT_TO_PHYS(temp_pt) | PAGE_KERNEL;
+
+    // 5. Garante que entry 0 está zerada
+    page_directory[0] = 0;
+
+    // 6. Flush completo do TLB
+    asm volatile("mov %%cr3, %%eax; mov %%eax, %%cr3" ::: "eax", "memory");
+}
+```
+
+O alinhamento em 4096 bytes nas page tables é obrigatório pelo hardware: os 12 bits baixos de uma PDE/PTE são usados para flags, não para endereço. Se a page table não estiver alinhada, a MMU lê o frame errado.
+
+### Endereço físico das page tables estáticas
+
+`kernel_pt` e `temp_pt` são arrays estáticos no `.bss` do kernel. Seu endereço virtual é `0xC01xxxxx`. Para instalar no page directory, a PDE precisa do endereço **físico**:
+
+```c
+#define VIRT_TO_PHYS(vaddr) ((unsigned int)(vaddr) - 0xC0000000u)
+
+page_directory[768] = VIRT_TO_PHYS(kernel_pt) | PAGE_KERNEL;
+```
+
+### O que significa o valor `0x108023` em PD[768]
+
+Após `paging_init()`, inspecionar o page directory revela:
+
+```
+PD[768] = 0x108023
+```
+
+Decompondo:
+- `0x108000` → frame físico da `kernel_pt` (endereço físico de `kernel_pt`)
+- `0x023` → flags: `Present(1) | Write(2) | Accessed(20)`
+  - O bit `Accessed` é setado **automaticamente pela CPU** na primeira vez que a page table é lida. Não foi colocado pelo kernel — é comportamento normal do hardware.
+- **Bit 7 (PSE) = 0** — confirma que é uma page table de 4 KB, não uma large page
+
+---
+
+## 6. Mapeamento Temporário de Frames (Cap. 10.2)
+
+### O problema
+
+`pfa_alloc()` retorna um **endereço físico** — por exemplo, `0x10E000`. Após remover o identity map, esse endereço físico não tem nenhum mapeamento virtual. Tentar acessar `0x10E000` diretamente em C causaria page fault:
+
+```
+0x10E000 → não mapeado → #PF
+```
+
+Para poder escrever ou ler um frame recém-alocado, é preciso criar um mapeamento virtual para ele temporariamente.
+
+### A solução: slot fixo na `temp_pt`
+
+Reservamos uma página virtual fixa como "janela":
+
+```
+TEMP_MAP_VADDR = 0xC07FF000
+  → PD index  = 769   (0xC07FF000 >> 22)
+  → PT index  = 1023  ((0xC07FF000 >> 12) & 0x3FF)
+  → temp_pt[1023]
+```
+
+Para mapear um frame:
+1. Escreve o endereço físico em `temp_pt[1023]` com flags
+2. Invalida só essa entrada do TLB com `invlpg`
+3. Acessa o frame pelo endereço virtual `0xC07FF000`
+4. Quando terminar: zera `temp_pt[1023]` e invalida novamente
+
+### Implementação
+
+```c
+#define TEMP_MAP_VADDR   0xC07FF000u
+#define TEMP_MAP_PT_IDX  1023
+
+void *temp_map(unsigned int phys)
+{
+    temp_pt[TEMP_MAP_PT_IDX] = (phys & 0xFFFFF000u) | PAGE_KERNEL;
+    asm volatile("invlpg (%0)" :: "r"(TEMP_MAP_VADDR) : "memory");
+    return (void *)TEMP_MAP_VADDR;
+}
+
+void temp_unmap(void)
+{
+    temp_pt[TEMP_MAP_PT_IDX] = 0;
+    asm volatile("invlpg (%0)" :: "r"(TEMP_MAP_VADDR) : "memory");
+}
+```
+
+### Por que `invlpg` é suficiente aqui (ao contrário da remoção do identity map)
+
+Na remoção do identity map, a entrada era uma **large page PSE de 4 MB** — `invlpg` não garante invalidar large pages. Aqui, a `temp_pt` contém **páginas normais de 4 KB** — `invlpg` invalida exatamente uma entrada de 4 KB no TLB, que é exatamente o que precisamos.
+
+### Uso típico
+
+```c
+// Aloca um frame físico
+unsigned int frame = pfa_alloc();   // ex.: retorna 0x10E000
+
+// frame é endereço físico — não pode ser derreferenciado diretamente!
+
+// Mapeia temporariamente para poder escrever
+unsigned int *ptr = (unsigned int *) temp_map(frame);
+ptr[0] = 0xDEADBEEF;               // escreve no frame via endereço virtual
+ptr[1] = 0xC0FFEE00;
+
+// Remove o mapeamento quando terminar
+temp_unmap();
+
+// O frame físico agora pode ser mapeado permanentemente em outro endereço
+paging_map(0xC0800000, frame, PAGE_KERNEL);
+```
+
+### Confirmação do funcionamento
+
+```
+temp_map frame: 0x10E000
+temp_map[0]: 0xDEADBEEF    ✓ escrita e leitura funcionando
+temp_map[1]: 0xC0FFEE00    ✓ frame físico acessível via janela virtual
+```
+
+---
+
+## 7. Diagnóstico da Paginação
+
+Para verificar se toda a cadeia está correta, a função `paging_check()` em `kmain.c` inspeciona o page directory diretamente e testa traduções de endereço:
+
+```c
+static void paging_check(void)
+{
+    extern unsigned int page_directory[1024];
+
+    // PD[0] deve ser zero (identity map removido)
+    // PD[768] deve ter PSE=0 e Present=1 (page table de 4 KB)
+    // PD[769] deve ser não-zero (temp_pt instalada)
+    // 0xC0100000 deve traduzir para 0x100000 (kernel)
+    // 0xC00B8000 deve traduzir para 0xB8000 (VGA)
+    // 0xD0000000 deve retornar 0 (não mapeado)
+}
+```
+
+### Resultado confirmado em execução
+
+```
+=== PAGING DIAGNOSTICS ===
+PD[0]          = 0x0         ✓ identity map removido
+PD[768]        = 0x108023
+  PSE bit      = 0           ✓ page table de 4 KB
+  Present bit  = 1           ✓
+PD[769]        = 0x109003    ✓ temp_pt instalada
+
+0xC0100000  -> 0x100000      ✓ kernel mapeado corretamente
+0xC00B8000  -> 0xB8000       ✓ VGA acessível
+0xC0000000  -> 0x0           ✓ base do espaço do kernel
+0xD0000000  -> 0x0           ✓ não mapeado retorna 0
+
+[OK] Paginacao configurada corretamente
+```
+
+---
+
+## 8. Ordem de Inicialização em `kmain`
+
+A ordem dos subsistemas não é arbitrária:
+
+```c
+void kmain(...) {
+    // 1. Converte multiboot_addr físico → virtual (primeira linha, antes de tudo)
+    multiboot_info_t *mbinfo = (multiboot_info_t *)(multiboot_addr + 0xC0000000u);
+
+    // 2. Limpa a tela (não depende de nada)
+    fb_clear();
+
+    // 3. PFA precisa ler o mmap do GRUB via mbinfo — já virtual
+    pfa_init(kernel_physical_start, kernel_physical_end, mbinfo);
+
+    // 4. paging_init pode chamar pfa_alloc() para novas page tables
+    paging_init();
+
+    // 5. Demais drivers
+    gdt_init();
+    serial_init();
+    idt_init();
+    pic_remap();
+}
+```
+
+`pfa_init` antes de `paging_init` porque a inicialização das page tables pode precisar alocar novos frames. `paging_init` antes dos demais drivers porque alguns drivers acessam endereços fixos (como o framebuffer em `0xC00B8000`) que dependem do mapeamento de 4 KB estar no lugar.
+
+---
+
+## 9. Saída do Kernel
+
+Com todas as funcionalidades dos Capítulos 9 e 10 implementadas, a saída do kernel é:
+
+```
+[INFO] Sistema Operacional Iniciado
+kernel virtual:  0xC0100000 - 0xC010A000
+kernel physical: 0x100000 - 0x10A000
+Tamanho do kernel: 40 KB
+frame1: 0x10B000
+frame2: 0x10C000
+frame3: 0x10D000
+frame4 (reuso f1): 0x10B000
+temp_map frame: 0x10E000
+temp_map[0]: 0xDEADBEEF
+temp_map[1]: 0xC0FFEE00
+Modulos: 1
+Modulo em phys: 0x10A000
+```
+
+Os frames alocados (`0x10B000`, `0x10C000`, `0x10D000`) estão imediatamente acima do kernel (`0x10A000`), confirmando que o PFA está respeitando os limites corretos. O `frame4` sendo igual ao `frame1` confirma que `pfa_free` funciona corretamente.
+
+---
+
+## Próximos passos
+
+### Kernel Heap (Cap. 10.3)
+
+Com o PFA e o mapeamento temporário funcionando, o próximo passo é implementar `kmalloc` e `kfree` — um heap para o kernel.
+
+A ideia é manter um ponteiro para o próximo endereço virtual livre acima do kernel, e para cada alocação:
+1. Chamar `pfa_alloc()` para obter um frame físico
+2. Chamar `paging_map()` para mapear esse frame no próximo endereço virtual disponível
+3. Retornar o endereço virtual ao chamador
+
+```
+heap_start = kernel_virtual_end (ex.: 0xC010A000)
+   ↓ cada kmalloc avança esse ponteiro em PAGE_SIZE
+heap_current → próxima página virtual livre
+```
+
+### User Mode (Cap. 11)
+
+Com a paginação de 4 KB e o espaço virtual dividido, é possível criar um page directory separado para cada processo de usuário — com os 3 GB inferiores exclusivos do processo e o 1 GB superior mapeando o kernel compartilhado.

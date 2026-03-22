@@ -1,0 +1,19 @@
+
+=== PAGING DIAGNOSTICS ===
+PD[0]          = 0x0  (esperado: 0x0)
+PD[768]        = 0x108023
+  PSE bit      = 0     (esperado: 0 = 4KB PT)
+  Present bit  = 1     (esperado: 1)
+PD[769]        = 0x109003  (esperado: != 0)
+
+--- traducoes de endereco ---
+0xC0100000  -> 0x100000  (esperado: 0x100000)
+0xC00B8000  -> 0xB8000  (esperado: 0xB8000)
+0xC0000000  -> 0x0  (esperado: 0x0)
+0xD0000000  -> 0x0  (esperado: 0x0 = nao mapeado)
+
+--- resultado ---
+[OK] Paginacao configurada corretamente
+==========================
+
+[INFO] Sistema Operacional Iniciado

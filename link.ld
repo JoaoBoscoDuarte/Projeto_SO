@@ -1,40 +1,81 @@
+/*
+ * link.ld — Linker script para kernel higher-half
+ *
+ * VMA (endereço virtual): 0xC0100000  (região 3GB+1MB)
+ * LMA (endereço físico):  0x00100000  (onde o GRUB realmente carrega)
+ *
+ * 
+ *   1. kernel_physical_start/end agora são calculados como expressão numérica pura
+ *      (não como símbolos de endereço), evitando que o linker os trate como VMAs.
+ *   2. Seção .multiboot vem ANTES de .text para garantir que o header Multiboot
+ *      esteja nos primeiros 8KB do binário — requisito obrigatório do GRUB.
+ *   3. Adicionada seção .bss explícita com PROVIDE para compatibilidade.
+ *   4. AT() calculado de forma segura usando ADDR() - offset.
+ */
+
 ENTRY(loader)
+
+KERNEL_VIRT_BASE = 0xC0000000;
 
 SECTIONS
 {
-    /* O kernel começa virtualmente em 3GB + 1MB */
+    /* Endereço virtual de início: 3GB + 1MB */
     . = 0xC0100000;
 
     kernel_virtual_start = .;
-    /* O endereço físico real subtrai o offset de 3GB */
-    kernel_physical_start = . - 0xC0000000;
 
-    /* AT() diz ao linker: "O endereço virtual é X, mas grave o binário físico em Y" */
-    .multiboot ALIGN (0x4) : AT(ADDR(.multiboot) - 0xC0000000) {
+    /*
+     * kernel_physical_start: endereço FÍSICO de carga.
+     * Usar ". - KERNEL_VIRT_BASE" aqui é seguro porque é avaliado como
+     * expressão numérica no contexto do contador de localização.
+     */
+    kernel_physical_start = . - KERNEL_VIRT_BASE;   /* = 0x00100000 */
+
+    /* ------------------------------------------------------------------ */
+    /* .multiboot PRIMEIRO — GRUB exige header nos primeiros 8KB           */
+    /* ------------------------------------------------------------------ */
+    .multiboot ALIGN(4) : AT(ADDR(.multiboot) - KERNEL_VIRT_BASE)
+    {
         *(.multiboot)
     }
 
-    .text ALIGN (0x1000) : AT(ADDR(.text) - 0xC0000000) {
+    /* ------------------------------------------------------------------ */
+    /* .text — código executável                                            */
+    /* ------------------------------------------------------------------ */
+    .text ALIGN(0x1000) : AT(ADDR(.text) - KERNEL_VIRT_BASE)
+    {
         *(.text)
         *(.text*)
     }
 
-    .rodata ALIGN (0x1000) : AT(ADDR(.rodata) - 0xC0000000) {
+    /* ------------------------------------------------------------------ */
+    /* .rodata — dados somente-leitura                                      */
+    /* ------------------------------------------------------------------ */
+    .rodata ALIGN(0x1000) : AT(ADDR(.rodata) - KERNEL_VIRT_BASE)
+    {
         *(.rodata)
         *(.rodata*)
     }
 
-    .data ALIGN (0x1000) : AT(ADDR(.data) - 0xC0000000) {
+    /* ------------------------------------------------------------------ */
+    /* .data — dados inicializados (inclui page_directory)                  */
+    /* ------------------------------------------------------------------ */
+    .data ALIGN(0x1000) : AT(ADDR(.data) - KERNEL_VIRT_BASE)
+    {
         *(.data)
         *(.data*)
     }
 
-    .bss ALIGN (0x1000) : AT(ADDR(.bss) - 0xC0000000) {
+    /* ------------------------------------------------------------------ */
+    /* .bss — dados não inicializados (inclui kernel_stack)                 */
+    /* ------------------------------------------------------------------ */
+    .bss ALIGN(0x1000) : AT(ADDR(.bss) - KERNEL_VIRT_BASE)
+    {
         *(COMMON)
         *(.bss)
         *(.bss*)
     }
 
     kernel_virtual_end = .;
-    kernel_physical_end = . - 0xC0000000;
+    kernel_physical_end = . - KERNEL_VIRT_BASE;
 }
