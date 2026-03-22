@@ -16,7 +16,7 @@
 #define FB_LOW_BYTE     15      // Registrador: byte baixo da posição do cursor
 
 // Ponteiro para a memória de vídeo VGA
-static char *fb = (char *) 0x000B8000;  // Endereço fixo da memória VGA
+static char *fb = (char *) 0xC00B8000;  // Endereço fixo da memória VGA
 
 // Posição atual do cursor (0-1999, onde 0 = canto superior esquerdo)
 static unsigned short cursor_pos = 0;

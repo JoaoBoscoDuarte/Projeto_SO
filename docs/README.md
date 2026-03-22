@@ -18,7 +18,15 @@
 
 **Recomendado para**: Entendimento linha por linha
 
+### 5. [Criando a VM](05-criando-vm.md)
+
+**Recomendado para**: Configuração do ambiente de emulação
+
+### 6. [Paging e Page Frame Allocator](06-paging-e-pfa.md)
+
+**Recomendado para**: Entender o sistema de memória virtual e alocação de frames
+
 ---
 
-**Última atualização**: Documentação inicial do projeto
-**Versão**: 1.0
+**Última atualização**: Adicionado documento sobre Paging e PFA
+**Versão**: 1.1
