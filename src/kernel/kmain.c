@@ -135,8 +135,8 @@ void kmain(unsigned int multiboot_addr,
      * ------------------------------------------------------------------ */
     fb_clear();
 
+    paging_init();   // primeiro (ativa higher-half de verdade)
     pfa_init(kernel_physical_start, kernel_physical_end, mbinfo);
-    paging_init();
 
     gdt_init();
     serial_init();
@@ -174,6 +174,10 @@ void kmain(unsigned int multiboot_addr,
     pfa_free(f1);
     unsigned int f4 = pfa_alloc();   /* deve reutilizar f1 */
     kprintf(OUTPUT_FB, "frame4 (reuso f1): 0x%x\n", f4);
+
+    kprintf(OUTPUT_FB, "PFA total_frames: %u\n", pfa_total_frames());
+    kprintf(OUTPUT_FB, "PFA bitmap phys: 0x%x - 0x%x\n",
+        pfa_bitmap_start(), pfa_bitmap_end());
 
     /* ------------------------------------------------------------------
      * 6. Teste de mapeamento temporário — Capítulo 10.2
