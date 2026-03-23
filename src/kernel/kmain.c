@@ -2,6 +2,7 @@
 #include "serial.h"
 #include "printf.h"
 #include "gdt.h"
+#include "kheap.h"
 #include "pic.h"
 #include "idt.h"
 #include "multiboot.h"
@@ -48,7 +49,7 @@ static void paging_check(void)
     kprintf(OUTPUT_SERIAL, "PD[769]        = 0x%x  (esperado: != 0)\n",
             pde769);
 
-    /* 4. Traducoes virtuais -> fisicas */
+    /* 4. Traduções virtuais -> físicas */
     kprintf(OUTPUT_SERIAL, "\n--- traducoes de endereco ---\n");
 
     unsigned int k_phys = paging_get_phys(0xC0100000);
@@ -91,15 +92,14 @@ static void paging_check(void)
  *
  * Recebe argumentos empurrados pelo loader.s (em ordem cdecl):
  *   multiboot_addr       : endereço FÍSICO da struct multiboot_info
- *   kernel_virtual_start : VMA do início do kernel  (ex.: 0xC0100000)
+ *   kernel_virtual_start : VMA do início do kernel
  *   kernel_virtual_end   : VMA do fim do kernel
- *   kernel_physical_start: LMA do início do kernel  (ex.: 0x00100000)
+ *   kernel_physical_start: LMA do início do kernel
  *   kernel_physical_end  : LMA do fim do kernel
  *
- * REGRA DE OURO — endereços no higher-half:
- *   Ponteiros físicos recebidos do GRUB precisam de +0xC0000000 antes
- *   de serem derreferenciados. A entrada 768 do PD mapeia os primeiros
- *   4MB: físico 0x0–0x3FFFFF ↔ virtual 0xC0000000–0xC03FFFFF.
+ * REGRA DE OURO — higher-half kernel:
+ *   Estruturas apontadas pelo GRUB chegam com endereços físicos e devem ser
+ *   convertidas para virtual antes de serem dereferenciadas.
  * ============================================================================ */
 void kmain(unsigned int multiboot_addr,
            unsigned int kernel_virtual_start,
@@ -108,8 +108,7 @@ void kmain(unsigned int multiboot_addr,
            unsigned int kernel_physical_end)
 {
     /* ------------------------------------------------------------------
-     * 1. Converte multiboot_addr físico → virtual ANTES de qualquer
-     *    derreferenciamento. Sem isso: page fault imediato.
+     * 1. Conversão inicial de estruturas Multiboot
      * ------------------------------------------------------------------ */
     multiboot_info_t *mbinfo =
         (multiboot_info_t *)(multiboot_addr + 0xC0000000u);
@@ -117,40 +116,41 @@ void kmain(unsigned int multiboot_addr,
     unsigned int flags             = mbinfo->flags;
     unsigned int number_of_modules = mbinfo->mods_count;
 
-    /* mods_addr dentro da struct também é físico — converte agora */
-    multiboot_module_t *mods = (multiboot_module_t *) 0;
+    multiboot_module_t *mods = (multiboot_module_t *)0;
     if ((flags & MULTIBOOT_INFO_MODS) && number_of_modules > 0) {
         mods = (multiboot_module_t *)(mbinfo->mods_addr + 0xC0000000u);
     }
 
     /* ------------------------------------------------------------------
-     * 2. Inicialização dos subsistemas
+     * 2. Inicialização base do kernel
      *
-     *    ORDEM OBRIGATÓRIA:
-     *      a) fb_clear   — limpa tela (não depende de nada)
-     *      b) pfa_init   — inicializa bitmap de frames físicos
-     *      c) paging_init— troca PSE 4MB por page tables reais de 4KB
-     *                      (pode chamar pfa_alloc internamente)
-     *      d) demais drivers
+     * Fluxo atual:
+     *   a) fb_clear    → prepara a saída visual
+     *   b) paging_init → instala page tables reais de 4KB
+     *   c) pfa_init    → inicializa o allocator de frames físicos
+     *   d) kheap_init  → cria a heap do kernel sobre paging + PFA
      * ------------------------------------------------------------------ */
     fb_clear();
 
-    paging_init();   // primeiro (ativa higher-half de verdade)
+    paging_init();
     pfa_init(kernel_physical_start, kernel_physical_end, mbinfo);
+    kheap_init();
 
+    /* ------------------------------------------------------------------
+     * 3. Inicialização de descritores, interrupções e I/O básico
+     * ------------------------------------------------------------------ */
     gdt_init();
     serial_init();
     idt_init();
     pic_remap();
 
     /* ------------------------------------------------------------------
-     * 3. Diagnóstico da paginação (output na serial)
-     *    Remove ou comenta este bloco quando não for mais necessário.
+     * 4. Diagnóstico da paginação
      * ------------------------------------------------------------------ */
     paging_check();
 
     /* ------------------------------------------------------------------
-     * 4. Mensagens de inicialização
+     * 5. Informações gerais de boot
      * ------------------------------------------------------------------ */
     log_info("Sistema Operacional Iniciado");
 
@@ -162,64 +162,87 @@ void kmain(unsigned int multiboot_addr,
             (kernel_virtual_end - kernel_virtual_start) / 1024);
 
     /* ------------------------------------------------------------------
-     * 5. Testes do PFA (Page Frame Allocator)
+     * 6. Testes do Page Frame Allocator (PFA)
+     *
+     * Valida:
+     *   - alocação sequencial de frames físicos
+     *   - reutilização após free
+     *   - exposição de metadados do allocator
      * ------------------------------------------------------------------ */
     unsigned int f1 = pfa_alloc();
     unsigned int f2 = pfa_alloc();
     unsigned int f3 = pfa_alloc();
+
     kprintf(OUTPUT_FB, "frame1: 0x%x\n", f1);
     kprintf(OUTPUT_FB, "frame2: 0x%x\n", f2);
     kprintf(OUTPUT_FB, "frame3: 0x%x\n", f3);
 
     pfa_free(f1);
-    unsigned int f4 = pfa_alloc();   /* deve reutilizar f1 */
-    kprintf(OUTPUT_FB, "frame4 (reuso f1): 0x%x\n", f4);
+    unsigned int f4 = pfa_alloc();
 
-    kprintf(OUTPUT_FB, "PFA total_frames: %u\n", pfa_total_frames());
+    kprintf(OUTPUT_FB, "frame4 (reuso f1): 0x%x\n", f4);
+    kprintf(OUTPUT_FB, "PFA total_frames: %d\n", pfa_total_frames());
     kprintf(OUTPUT_FB, "PFA bitmap phys: 0x%x - 0x%x\n",
-        pfa_bitmap_start(), pfa_bitmap_end());
+            pfa_bitmap_start(), pfa_bitmap_end());
 
     /* ------------------------------------------------------------------
-     * 6. Teste de mapeamento temporário — Capítulo 10.2
+     * 7. Testes da kernel heap
      *
-     *    pfa_alloc() retorna endereço FÍSICO.
-     *    temp_map() mapeia esse frame em 0xC07FF000 temporariamente,
-     *    permitindo escrita/leitura antes de mapeá-lo definitivamente.
+     * Valida:
+     *   - inicialização da heap
+     *   - alocação dinâmica em bytes
+     *   - retorno de ponteiros na região virtual do heap
+     * ------------------------------------------------------------------ */
+    void *a = kmalloc(32);
+    void *b = kmalloc(64);
+
+    kprintf(OUTPUT_FB, "a: 0x%x\n", a);
+    kprintf(OUTPUT_FB, "b: 0x%x\n", b);
+
+    kfree(a);
+
+    /* ------------------------------------------------------------------
+     * 8. Teste de mapeamento temporário — temp_map()
+     *
+     * pfa_alloc() retorna endereço físico.
+     * temp_map() expõe esse frame em uma janela virtual fixa para acesso
+     * temporário em software.
      * ------------------------------------------------------------------ */
     unsigned int test_frame = pfa_alloc();
     kprintf(OUTPUT_FB, "temp_map frame: 0x%x\n", test_frame);
+
     if (test_frame != 0) {
-        unsigned int *ptr = (unsigned int *) temp_map(test_frame);
+        unsigned int *ptr = (unsigned int *)temp_map(test_frame);
+
         ptr[0] = 0xDEADBEEF;
         ptr[1] = 0xC0FFEE00;
+
         kprintf(OUTPUT_FB, "temp_map[0]: 0x%x\n", ptr[0]);
         kprintf(OUTPUT_FB, "temp_map[1]: 0x%x\n", ptr[1]);
+
         temp_unmap();
         pfa_free(test_frame);
     }
 
     /* ------------------------------------------------------------------
-     * 7. Informações do multiboot
+     * 9. Informações de Multiboot e módulos carregados
      * ------------------------------------------------------------------ */
     kprintf(OUTPUT_FB, "\nFlags: %d\n", flags);
     kprintf(OUTPUT_FB, "Modulos: %d\n", number_of_modules);
 
     /* ------------------------------------------------------------------
-     * 8. Executa módulo GRUB (se existir)
-     *
-     *    mods[0].mod_start é FÍSICO. Converte para virtual somando
-     *    0xC0000000 — funciona enquanto o módulo estiver nos primeiros
-     *    4MB (cobertos pela entrada 768 do PD).
+     * 10. Execução do módulo carregado pelo GRUB
      * ------------------------------------------------------------------ */
-    if (mods != (multiboot_module_t *) 0) {
+    if (mods != (multiboot_module_t *)0) {
         kprintf(OUTPUT_FB, "Modulo em phys: 0x%x\n", mods[0].mod_start);
+
         unsigned int module_virt = mods[0].mod_start + 0xC0000000u;
-        call_module_t start_program = (call_module_t) module_virt;
+        call_module_t start_program = (call_module_t)module_virt;
         start_program();
     }
 
     /* ------------------------------------------------------------------
-     * 9. Loop final — habilita interrupções e aguarda
+     * 11. Estado final do kernel
      * ------------------------------------------------------------------ */
     log_debug("Drivers carregados com sucesso");
     log_error("Teste de mensagem de erro");

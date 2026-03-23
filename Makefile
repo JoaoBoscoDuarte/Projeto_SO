@@ -40,7 +40,8 @@ OBJECTS = $(BUILD_DIR)/loader.o \
           $(BUILD_DIR)/interrupts.o \
           $(BUILD_DIR)/keyboard.o \
           $(BUILD_DIR)/pfa.o \
-          $(BUILD_DIR)/paging.o
+          $(BUILD_DIR)/paging.o \
+		  $(BUILD_DIR)/kheap.o
 
 all: kernel.elf
 
@@ -161,6 +162,9 @@ $(BUILD_DIR)/pfa.o: $(SRC_DIR)/drivers/pfa.c
 $(BUILD_DIR)/paging.o: $(SRC_DIR)/drivers/paging.c
 	$(CC) $(CFLAGS) $< -o $@
 
+$(BUILD_DIR)/kheap.o: $(SRC_DIR)/kernel/kheap.c
+	$(CC) $(CFLAGS) $< -o $@
+	
 clean:
 	rm -rf $(BUILD_DIR) kernel.elf os.iso
 
