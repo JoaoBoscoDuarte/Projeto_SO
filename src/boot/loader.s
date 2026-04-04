@@ -15,6 +15,7 @@
 
     global loader
     global page_directory          ; exporta para paging.c usar via extern
+    global kernel_stack            ; exporta para tss_init() calcular topo da stack
 
     ; ----------------------------------------------------------------------------
     ; Constantes Multiboot

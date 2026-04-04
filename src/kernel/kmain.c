@@ -2,14 +2,17 @@
 #include "serial.h"
 #include "printf.h"
 #include "gdt.h"
+#include "tss.h"
 #include "kheap.h"
 #include "pic.h"
 #include "idt.h"
 #include "multiboot.h"
 #include "pfa.h"
 #include "paging.h"
+#include "process.h"
 
-typedef void (*call_module_t)(void);
+/* kernel_stack definido em loader.s (.bss) — topo = kernel_stack + 4096 */
+extern unsigned char kernel_stack[];
 
 /* ============================================================================
  * paging_check() — Diagnóstico do subsistema de paginação
@@ -140,6 +143,11 @@ void kmain(unsigned int multiboot_addr,
      * 3. Inicialização de descritores, interrupções e I/O básico
      * ------------------------------------------------------------------ */
     gdt_init();
+
+    /* TSS: kernel_stack é o início do buffer de 4096 bytes;
+     * o topo (ESP inicial) está em kernel_stack + 4096. */
+    tss_init(GDT_KERNEL_DATA, (unsigned int)(kernel_stack + 4096));
+
     serial_init();
     idt_init();
     pic_remap();
@@ -231,21 +239,45 @@ void kmain(unsigned int multiboot_addr,
     kprintf(OUTPUT_FB, "Modulos: %d\n", number_of_modules);
 
     /* ------------------------------------------------------------------
-     * 10. Execução do módulo carregado pelo GRUB
+     * 10. Inicia processo user mode a partir do módulo GRUB
+     *
+     *    mods[0].mod_start é endereço FÍSICO do binário flat carregado
+     *    pelo GRUB. process_create() aloca um page directory próprio,
+     *    copia o código e configura a stack do processo.
+     *    enter_usermode() faz a transição ring 0 → ring 3 via iret.
      * ------------------------------------------------------------------ */
-    if (mods != (multiboot_module_t *)0) {
-        kprintf(OUTPUT_FB, "Modulo em phys: 0x%x\n", mods[0].mod_start);
+    if (mods != (multiboot_module_t *) 0) {
+        unsigned int mod_start = mods[0].mod_start;
+        unsigned int mod_end   = mods[0].mod_end;
+        unsigned int mod_size  = mod_end - mod_start;
 
-        unsigned int module_virt = mods[0].mod_start + 0xC0000000u;
-        call_module_t start_program = (call_module_t)module_virt;
-        start_program();
+        kprintf(OUTPUT_FB, "Modulo: phys 0x%x - 0x%x (%d bytes)\n",
+                mod_start, mod_end, mod_size);
+
+        struct process proc = process_create(mod_start, mod_size);
+
+        if (proc.eip == 0) {
+            log_error("Falha ao criar processo user mode");
+        } else {
+            kprintf(OUTPUT_FB, "Processo criado: eip=0x%x esp=0x%x pd=0x%x\n",
+                    proc.eip, proc.esp, proc.page_directory_phys);
+            log_info("Entrando em user mode...");
+
+            /* Habilita interrupções antes de entrar em user mode:
+             * iret carregará eflags com IF=1 (definido em usermode.s),
+             * mas o PIC já está configurado — sem sti aqui o teclado
+             * funciona somente após o iret. */
+            asm volatile("sti");
+
+            enter_usermode(proc.eip, proc.esp, proc.page_directory_phys);
+            /* enter_usermode() não retorna */
+        }
     }
 
     /* ------------------------------------------------------------------
-     * 11. Estado final do kernel
+     * 11. Loop final — habilita interrupções e aguarda
      * ------------------------------------------------------------------ */
     log_debug("Drivers carregados com sucesso");
-    log_error("Teste de mensagem de erro");
 
     asm volatile("sti");
     while (1) {

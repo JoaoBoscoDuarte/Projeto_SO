@@ -35,13 +35,17 @@ OBJECTS = $(BUILD_DIR)/loader.o \
           $(BUILD_DIR)/printf.o \
           $(BUILD_DIR)/gdt.o \
           $(BUILD_DIR)/gdt_s.o \
+          $(BUILD_DIR)/tss.o \
+          $(BUILD_DIR)/tss_s.o \
           $(BUILD_DIR)/pic.o \
           $(BUILD_DIR)/idt.o \
           $(BUILD_DIR)/interrupts.o \
           $(BUILD_DIR)/keyboard.o \
           $(BUILD_DIR)/pfa.o \
           $(BUILD_DIR)/paging.o \
-		  $(BUILD_DIR)/kheap.o
+		  $(BUILD_DIR)/kheap.o \
+          $(BUILD_DIR)/process.o \
+          $(BUILD_DIR)/usermode.o
 
 all: kernel.elf
 
@@ -156,6 +160,12 @@ $(BUILD_DIR)/keyboard.o: $(SRC_DIR)/drivers/keyboard.c
 $(MODULE_PROGRAM): program.s | $(BUILD_DIR)
 	$(AS) -f bin $< -o $@
 
+$(BUILD_DIR)/tss.o: $(SRC_DIR)/drivers/tss.c
+	$(CC) $(CFLAGS) $< -o $@
+
+$(BUILD_DIR)/tss_s.o: $(SRC_DIR)/drivers/tss.s
+	$(AS) $(ASFLAGS) $< -o $@
+
 $(BUILD_DIR)/pfa.o: $(SRC_DIR)/drivers/pfa.c
 	$(CC) $(CFLAGS) $< -o $@
 
@@ -164,7 +174,13 @@ $(BUILD_DIR)/paging.o: $(SRC_DIR)/drivers/paging.c
 
 $(BUILD_DIR)/kheap.o: $(SRC_DIR)/kernel/kheap.c
 	$(CC) $(CFLAGS) $< -o $@
-	
+
+$(BUILD_DIR)/process.o: $(SRC_DIR)/kernel/process.c
+	$(CC) $(CFLAGS) $< -o $@
+
+$(BUILD_DIR)/usermode.o: $(SRC_DIR)/boot/usermode.s
+	$(AS) $(ASFLAGS) $< -o $@
+
 clean:
 	rm -rf $(BUILD_DIR) kernel.elf os.iso
 
