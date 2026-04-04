@@ -6,6 +6,7 @@
 #include "process.h"
 #include "pit.h"
 #include "top.h"
+#include "scheduler.h"
 
 extern void outb(unsigned short port, unsigned char data);
 
@@ -21,6 +22,28 @@ static const char *state_name(proc_state_t s)
     }
 }
 
+/* Processo de teste: alterna entre trabalho e yield para acumular ticks */
+static void worker_proc(void)
+{
+    while (1) {
+        /* Fica RUNNING por ~50ms (5 ticks a 100Hz) antes de ceder */
+        unsigned int start = pit_get_ticks();
+        while (pit_get_ticks() - start < 5)
+            asm volatile("hlt"); /* aguarda ticks com interrupcoes ativas */
+        yield();
+    }
+}
+
+static void cmd_spawn(const char *name)
+{
+    process_t *p = process_create_kernel(
+        (name && name[0]) ? name : "worker", worker_proc);
+    if (p)
+        kprintf(OUTPUT_FB, "Processo criado: PID %d (%s)\n", p->pid, p->name);
+    else
+        kprintf(OUTPUT_FB, "Erro: tabela de processos cheia\n");
+}
+
 static void cmd_help(void)
 {
     kprintf(OUTPUT_FB, "Comandos disponiveis:\n");
@@ -29,6 +52,8 @@ static void cmd_help(void)
     kprintf(OUTPUT_FB, "  ps     - lista processos\n");
     kprintf(OUTPUT_FB, "  top    - monitor de processos em tempo real\n");
     kprintf(OUTPUT_FB, "  info   - informacoes do sistema\n");
+    kprintf(OUTPUT_FB, "  spawn  - cria processo de teste (spawn [nome])\n");
+    kprintf(OUTPUT_FB, "  kill   - mata um processo (kill <pid>)\n");
     kprintf(OUTPUT_FB, "  reboot - reinicia o sistema\n");
 }
 
@@ -75,6 +100,21 @@ static void shell_execute(const char *cmd)
     else if (strcmp(cmd, "ps") == 0)    cmd_ps();
     else if (strcmp(cmd, "top") == 0)   top_run();
     else if (strcmp(cmd, "info") == 0)  cmd_info();
+    else if (strncmp(cmd, "spawn", 5) == 0) {
+        const char *arg = (strlen(cmd) > 6) ? cmd + 6 : "";
+        cmd_spawn(arg);
+    }
+    else if (strncmp(cmd, "kill", 4) == 0) {
+        if (strlen(cmd) > 5) {
+            unsigned int pid = (unsigned int)atoi(cmd + 5);
+            if (process_kill(pid) == 0)
+                kprintf(OUTPUT_FB, "Processo %d encerrado\n", pid);
+            else
+                kprintf(OUTPUT_FB, "kill: PID %d invalido\n", pid);
+        } else {
+            kprintf(OUTPUT_FB, "uso: kill <pid>\n");
+        }
+    }
     else if (strcmp(cmd, "reboot") == 0) cmd_reboot();
     else if (strlen(cmd) > 0)
         kprintf(OUTPUT_FB, "comando desconhecido: %s\n", cmd);

@@ -1,6 +1,7 @@
 #include "process.h"
 #include "paging.h"
 #include "pfa.h"
+#include "scheduler.h"
 
 /* page_directory definido em loader.s — PD do kernel ativo em CR3 */
 extern pde_t page_directory[1024];
@@ -146,12 +147,108 @@ process_t *process_get_by_pid(unsigned int pid)
 }
 
 /* ============================================================================
+ * process_kill — mata um processo pelo PID
+ * ========================================================================== */
+int process_kill(unsigned int pid)
+{
+    process_t *p;
+
+    if (pid == 0)
+        return -1; /* não mata o kernel */
+
+    p = process_get_by_pid(pid);
+    if (!p)
+        return -1;
+
+    p->state = PROC_ZOMBIE;
+
+    /* Se matou o processo atual, cede a CPU imediatamente */
+    if (p == current_process)
+        yield();
+
+    return 0;
+}
+
+/* ============================================================================
  * process_exit — marca o processo corrente como ZOMBIE
  * ========================================================================== */
 void process_exit(void)
 {
     if (current_process)
         current_process->state = PROC_ZOMBIE;
+}
+
+/* ============================================================================
+ * process_create_kernel — cria processo ring 0 a partir de uma função C
+ *
+ * Layout do frame inicial na kernel stack (lido por context_switch):
+ *
+ *   [topo da stack - 4]  endereço de retorno = func  ← ret em context_switch
+ *   [topo da stack - 8]  edi = 0
+ *   [topo da stack - 12] esi = 0
+ *   [topo da stack - 16] ebx = 0
+ *   [topo da stack - 20] ebp = 0  ← esp salvo em proc->esp
+ *
+ * context_switch faz: pop edi/esi/ebx/ebp, ret → salta para func.
+ * ========================================================================== */
+process_t *process_create_kernel(const char *name, void (*func)(void))
+{
+    unsigned int pid;
+    unsigned int kstack_frame;
+    unsigned int kstack_virt;
+    unsigned int *stack;
+    process_t *proc;
+
+    pid = process_next_pid();
+    if (pid == 0)
+        return (process_t *)0;
+
+    proc = &process_table[pid];
+
+    /* Aloca e mapeia a kernel stack */
+    kstack_frame = pfa_alloc();
+    if (kstack_frame == 0)
+        return (process_t *)0;
+
+    kstack_virt = KSTACK_BASE + pid * KSTACK_STRIDE;
+    if (paging_map(kstack_virt, kstack_frame, PAGE_KERNEL) != 0) {
+        pfa_free(kstack_frame);
+        return (process_t *)0;
+    }
+
+    /* Zera a stack */
+    stack = (unsigned int *)kstack_virt;
+    {
+        unsigned int i;
+        for (i = 0; i < KSTACK_SIZE / sizeof(unsigned int); i++)
+            stack[i] = 0;
+    }
+
+    /* Monta o frame inicial no topo da stack:
+     * context_switch faz 4x pop (edi,esi,ebx,ebp) depois ret.
+     * Empilhamos de cima para baixo: ret_addr, edi, esi, ebx, ebp */
+    unsigned int top = kstack_virt + KSTACK_SIZE;
+    unsigned int *sp = (unsigned int *)top;
+    *(--sp) = (unsigned int)func; /* endereço de retorno = entry point */
+    *(--sp) = 0;                  /* edi */
+    *(--sp) = 0;                  /* esi */
+    *(--sp) = 0;                  /* ebx */
+    *(--sp) = 0;                  /* ebp */
+
+    proc->pid                 = pid;
+    proc->state               = PROC_READY;
+    proc->ticks_total         = 0;
+    proc->kernel_stack_base   = kstack_virt;
+    proc->kernel_stack_top    = kstack_virt + KSTACK_SIZE;
+    proc->esp                 = (unsigned int)sp;
+    proc->ebp                 = (unsigned int)sp;
+    proc->eip                 = (unsigned int)func;
+    proc->page_directory_phys = 0; /* usa o PD do kernel */
+    proc->user_eip            = 0;
+    proc->user_esp            = 0;
+    str_copy_n(proc->name, name ? name : "kproc", PROC_NAME_LEN);
+
+    return proc;
 }
 
 /* ============================================================================

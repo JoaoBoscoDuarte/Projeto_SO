@@ -25,8 +25,7 @@ void pit_handler_c(void)
     system_ticks++;
     if (current_process)
         current_process->ticks_total++;
-    if (system_ticks % PREEMPT_INTERVAL == 0)
-        schedule();
+    outb(0x20, 0x20);
 }
 
 unsigned int pit_get_ticks(void)

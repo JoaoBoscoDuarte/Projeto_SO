@@ -34,7 +34,6 @@ static process_t *find_next_ready(void)
     if (!current_process)
         return (process_t *)0;
 
-    /* Índice do processo atual na tabela */
     start = (unsigned int)(current_process - process_table);
 
     for (i = 1; i < MAX_PROCESSES; i++) {

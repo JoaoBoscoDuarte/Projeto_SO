@@ -42,8 +42,6 @@ interrupt_handler_32:
     mov ds, ax
     mov es, ax
     call pit_handler_c
-    mov al, 0x20
-    out 0x20, al
     pop es
     pop ds
     popad

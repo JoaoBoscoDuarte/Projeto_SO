@@ -84,6 +84,25 @@ process_t *process_create_full(const char *name,
                                unsigned int code_size);
 
 /*
+ * process_create_kernel — cria um processo que roda uma função C em ring 0.
+ *
+ *   name : nome do processo
+ *   func : ponteiro para a função de entrada (void func(void))
+ *
+ * Aloca uma kernel stack, monta o frame inicial que context_switch espera
+ * encontrar, e insere o processo como READY na tabela.
+ *
+ * Retorna ponteiro para o process_t, ou NULL em falha.
+ */
+process_t *process_create_kernel(const char *name, void (*func)(void));
+
+/*
+ * process_kill — marca um processo como ZOMBIE pelo PID.
+ * Retorna 0 em sucesso, -1 se o PID não existir ou for o kernel (PID 0).
+ */
+int process_kill(unsigned int pid);
+
+/*
  * process_exit — marca o processo corrente como ZOMBIE.
  * O scheduler deve liberar recursos posteriormente.
  */
