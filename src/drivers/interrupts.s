@@ -20,7 +20,9 @@
 ; ============================================================================
 
 global idt_load
+global interrupt_handler_32
 global interrupt_handler_33
+extern pit_handler_c
 extern keyboard_handler_c
 
 ; idt_load — carrega a IDT usando o ponteiro passado do C
@@ -28,6 +30,24 @@ idt_load:
     mov eax, [esp + 4]
     lidt [eax]
     ret
+
+; ============================================================================
+; interrupt_handler_32 — IRQ0 (timer PIT, remapeado para vetor 32)
+; ============================================================================
+interrupt_handler_32:
+    pushad
+    push ds
+    push es
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    call pit_handler_c
+    mov al, 0x20
+    out 0x20, al
+    pop es
+    pop ds
+    popad
+    iretd
 
 ; ============================================================================
 ; interrupt_handler_33 — IRQ1 (teclado, remapeado para vetor 33)

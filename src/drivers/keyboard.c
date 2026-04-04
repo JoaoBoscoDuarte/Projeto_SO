@@ -70,6 +70,15 @@ char kbd_getchar(void)
     return c;
 }
 
+char kbd_try_getchar(void)
+{
+    if (kbd_tail == kbd_head)
+        return 0;
+    char c = kbd_buffer[kbd_tail];
+    kbd_tail = (kbd_tail + 1) % KBD_BUFFER_SIZE;
+    return c;
+}
+
 /* ============================================================================
  * kbd_readline — lê uma linha com eco no framebuffer
  * ========================================================================== */

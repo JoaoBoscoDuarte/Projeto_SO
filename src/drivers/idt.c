@@ -18,6 +18,7 @@ struct idt_entry idt[256]; // Criamos as 256 posições
 
 // Funções que vão vir lá do nosso Assembly (passo 3)
 extern void idt_load(uint32_t idt_ptr);
+extern void interrupt_handler_32(void);
 extern void interrupt_handler_33(void);
 
 // Função auxiliar para preencher uma posição da lista
@@ -39,6 +40,7 @@ void idt_init(void) {
     // 2. Agora, configuramos especificamente a interrupção 33 (Teclado).
     // Fazemos isso ANTES de carregar a IDT.
     // No idt_init:
+    idt_set_gate(32, (uint32_t)interrupt_handler_32, 0x08, 0x8E);
     idt_set_gate(33, (uint32_t)interrupt_handler_33, 0x08, 0x8E);
 
     // 3. Preparamos o ponteiro que a CPU vai usar.

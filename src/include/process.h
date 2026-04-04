@@ -36,6 +36,9 @@ typedef struct process {
     unsigned int   kernel_stack_base;   /* base (endereço baixo) da kstack */
     unsigned int   kernel_stack_top;    /* topo (esp0 no TSS)          */
 
+    /* Contagem de tempo */
+    unsigned int   ticks_total;         /* ticks de CPU consumidos         */
+
     /* Estado user-space salvo (para retorno ao ring 3) */
     unsigned int   user_eip;
     unsigned int   user_esp;

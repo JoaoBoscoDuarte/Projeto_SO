@@ -26,6 +26,12 @@ void keyboard_handler_c(void);
 char kbd_getchar(void);
 
 /*
+ * kbd_try_getchar — retorna o próximo caractere do buffer sem bloquear.
+ * Retorna 0 se o buffer estiver vazio.
+ */
+char kbd_try_getchar(void);
+
+/*
  * kbd_readline — lê uma linha de texto até '\n' ou max_len-1 caracteres.
  * Faz eco dos caracteres no framebuffer via fb_putchar().
  * Trata backspace ('\b') removendo o último caractere.

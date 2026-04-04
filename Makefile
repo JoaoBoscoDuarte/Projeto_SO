@@ -47,7 +47,11 @@ OBJECTS = $(BUILD_DIR)/loader.o \
           $(BUILD_DIR)/process.o \
           $(BUILD_DIR)/usermode.o \
           $(BUILD_DIR)/scheduler.o \
-          $(BUILD_DIR)/switch_s.o
+          $(BUILD_DIR)/switch_s.o \
+          $(BUILD_DIR)/string.o \
+          $(BUILD_DIR)/pit.o \
+          $(BUILD_DIR)/shell.o \
+          $(BUILD_DIR)/top.o
 
 all: kernel.elf
 
@@ -188,6 +192,18 @@ $(BUILD_DIR)/scheduler.o: $(SRC_DIR)/kernel/scheduler.c
 
 $(BUILD_DIR)/switch_s.o: $(SRC_DIR)/kernel/switch.s
 	$(AS) $(ASFLAGS) $< -o $@
+
+$(BUILD_DIR)/string.o: $(SRC_DIR)/lib/string.c
+	$(CC) $(CFLAGS) $< -o $@
+
+$(BUILD_DIR)/pit.o: $(SRC_DIR)/drivers/pit.c
+	$(CC) $(CFLAGS) $< -o $@
+
+$(BUILD_DIR)/shell.o: $(SRC_DIR)/kernel/shell.c
+	$(CC) $(CFLAGS) $< -o $@
+
+$(BUILD_DIR)/top.o: $(SRC_DIR)/kernel/top.c
+	$(CC) $(CFLAGS) $< -o $@
 
 clean:
 	rm -rf $(BUILD_DIR) kernel.elf os.iso

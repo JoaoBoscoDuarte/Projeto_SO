@@ -111,8 +111,9 @@ void process_init(void)
     }
 
     /* PID 0 = kernel/idle */
-    process_table[0].pid   = 0;
-    process_table[0].state = PROC_RUNNING;
+    process_table[0].pid         = 0;
+    process_table[0].state       = PROC_RUNNING;
+    process_table[0].ticks_total = 0;
     str_copy_n(process_table[0].name, "kernel", PROC_NAME_LEN);
     current_process = &process_table[0];
 }
@@ -281,6 +282,7 @@ process_t *process_create_full(const char *name,
     /* Passo 8: preenche o PCB */
     proc->pid                 = pid;
     proc->state               = PROC_READY;
+    proc->ticks_total         = 0;
     str_copy_n(proc->name, name ? name : "proc", PROC_NAME_LEN);
     proc->page_directory_phys = pd_phys;
     proc->kernel_stack_base   = kstack_virt;
