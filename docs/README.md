@@ -1,32 +1,19 @@
-# Documentação do Projeto SO
+# Documentação — Projeto SO
 
-## Índice de Documentos
+Documentação completa do sistema operacional desenvolvido na disciplina de Sistemas Operacionais da UFPB.
 
-### 1. [Estrutura do Projeto](01-estrutura-do-projeto.md)
+## Índice
 
-**Recomendado para**: Iniciantes
-
-### 2. [Processo de Boot](02-processo-de-boot.md)
-
-**Recomendado para**: Após entender a estrutura
-
-### 3. [Conceitos Fundamentais](03-conceitos-fundamentais.md)
-
-**Recomendado para**: Aprofundamento teórico
-
-### 4. [Análise Detalhada do Código](04-analise-do-codigo.md)
-
-**Recomendado para**: Entendimento linha por linha
-
-### 5. [Criando a VM](05-criando-vm.md)
-
-**Recomendado para**: Configuração do ambiente de emulação
-
-### 6. [Paging e Page Frame Allocator](06-paging-e-pfa.md)
-
-**Recomendado para**: Entender o sistema de memória virtual e alocação de frames
+| # | Documento | Conteúdo |
+|---|-----------|----------|
+| 1 | [Estrutura do Projeto](01-estrutura-do-projeto.md) | Organização de arquivos, fluxo de build |
+| 2 | [Processo de Boot](02-processo-de-boot.md) | BIOS → GRUB → loader.s → kmain |
+| 3 | [Conceitos Fundamentais](03-conceitos-fundamentais.md) | x86, memória, interrupções, paginação |
+| 4 | [Drivers e Subsistemas](04-drivers-e-subsistemas.md) | FB, teclado, serial, GDT, IDT, PIC, PIT |
+| 5 | [Memória](05-memoria.md) | Paginação higher-half, PFA, heap do kernel |
+| 6 | [Processos e Scheduler](06-processos-e-scheduler.md) | PCB, context switch, scheduler cooperativo |
+| 7 | [Mini-Shell e Top](07-mini-shell-e-top.md) | Shell, comandos, monitor de processos |
 
 ---
 
-**Última atualização**: Adicionado documento sobre Paging e PFA
-**Versão**: 1.1
+**Versão atual:** higher-half kernel + paginação 4KB + PFA + heap + processos cooperativos + mini-shell + top

@@ -230,11 +230,20 @@ process_t *process_create_kernel(const char *name, void (*func)(void))
      * Empilhamos de cima para baixo: ret_addr, edi, esi, ebx, ebp */
     unsigned int top = kstack_virt + KSTACK_SIZE;
     unsigned int *sp = (unsigned int *)top;
-    *(--sp) = (unsigned int)func; /* endereço de retorno = entry point */
-    *(--sp) = 0;                  /* edi */
-    *(--sp) = 0;                  /* esi */
-    *(--sp) = 0;                  /* ebx */
+
+    /* context_switch faz (em ordem): pop edi, pop esi, pop ebx, pop ebp, ret
+     * Portanto empilhamos de cima para baixo (ordem inversa dos pops):
+     *   ret_addr  ← popado por ret
+     *   ebp = 0   ← popado por pop ebp
+     *   ebx = 0   ← popado por pop ebx
+     *   esi = 0   ← popado por pop esi
+     *   edi = 0   ← popado por pop edi  ← ESP aponta aqui
+     */
+    *(--sp) = (unsigned int)func; /* ret addr */
     *(--sp) = 0;                  /* ebp */
+    *(--sp) = 0;                  /* ebx */
+    *(--sp) = 0;                  /* esi */
+    *(--sp) = 0;                  /* edi */ /* proc->esp aponta aqui */
 
     proc->pid                 = pid;
     proc->state               = PROC_READY;

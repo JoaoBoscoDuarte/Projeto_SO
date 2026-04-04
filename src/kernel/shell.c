@@ -7,6 +7,7 @@
 #include "pit.h"
 #include "top.h"
 #include "scheduler.h"
+#include "serial.h"
 
 extern void outb(unsigned short port, unsigned char data);
 
@@ -22,15 +23,19 @@ static const char *state_name(proc_state_t s)
     }
 }
 
-/* Processo de teste: alterna entre trabalho e yield para acumular ticks */
+/* Processo de teste: loop de CPU puro, cede a cada 50000 iteracoes */
 static void worker_proc(void)
 {
+    volatile unsigned int counter = 0;
+    kprintf(OUTPUT_SERIAL, "[worker] iniciou pid=%d\n",
+        current_process ? current_process->pid : 99);
     while (1) {
-        /* Fica RUNNING por ~50ms (5 ticks a 100Hz) antes de ceder */
-        unsigned int start = pit_get_ticks();
-        while (pit_get_ticks() - start < 5)
-            asm volatile("hlt"); /* aguarda ticks com interrupcoes ativas */
-        yield();
+        counter++;
+        if (counter % 50000 == 0) {
+            kprintf(OUTPUT_SERIAL, "[worker] yield counter=%d ticks=%d\n",
+                counter, pit_get_ticks());
+            yield();
+        }
     }
 }
 

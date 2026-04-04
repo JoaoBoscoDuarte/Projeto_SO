@@ -1,289 +1,150 @@
-# Conceitos Fundamentais de Sistemas Operacionais
+# 03 — Conceitos Fundamentais
 
-## Introdução
+## 1. Modo Protegido x86 (32 bits)
 
-Este documento explica os conceitos essenciais para entender o desenvolvimento de um sistema operacional, com foco nos aspectos implementados neste projeto.
+O kernel opera em **modo protegido**, que oferece:
+- Endereçamento de até 4 GB de RAM
+- Proteção de memória via segmentação e paginação
+- Níveis de privilégio (rings 0–3)
+- Tratamento de interrupções via IDT
 
-## 1. Arquitetura x86
+### Rings de Privilégio
 
-### 1.1. Registradores
+| Ring | Nome | Acesso |
+|------|------|--------|
+| 0 | Kernel mode | Total — I/O, registradores de controle, tudo |
+| 3 | User mode | Restrito — sem I/O direto, sem acesso ao kernel |
 
-Registradores são pequenas áreas de memória extremamente rápidas dentro do processador.
+Este projeto opera inteiramente em **ring 0**.
 
-#### Registradores de Propósito Geral (32 bits)
+## 2. Segmentação — GDT
 
-- **EAX**: Acumulador (operações aritméticas, retorno de funções)
-- **EBX**: Base (endereçamento de memória)
-- **ECX**: Contador (loops)
-- **EDX**: Dados (operações de I/O)
-- **ESI**: Source Index (operações com strings)
-- **EDI**: Destination Index (operações com strings)
+A **Global Descriptor Table** define segmentos de memória. Cada entrada (descriptor) especifica base, limite e flags de acesso.
 
-#### Registradores de Ponteiro
+Entradas usadas neste projeto:
 
-- **ESP**: Stack Pointer (aponta para o topo da pilha)
-- **EBP**: Base Pointer (base do stack frame)
-- **EIP**: Instruction Pointer (próxima instrução a executar)
+| Índice | Seletor | Descrição |
+|--------|---------|-----------|
+| 0 | 0x00 | Null descriptor (obrigatório) |
+| 1 | 0x08 | Código kernel (ring 0, execute/read) |
+| 2 | 0x10 | Dados kernel (ring 0, read/write) |
+| 3 | 0x18 | Código usuário (ring 3) |
+| 4 | 0x20 | Dados usuário (ring 3) |
+| 5 | 0x28 | TSS descriptor |
 
-#### Registradores de Segmento
+## 3. Paginação — Two-Level Page Tables
 
-- **CS**: Code Segment
-- **DS**: Data Segment
-- **SS**: Stack Segment
-- **ES, FS, GS**: Segmentos extras
-
-### 1.2. Modos de Operação
-
-#### Real Mode (16 bits)
-
-- Modo inicial do processador
-- Acesso direto à memória
-- Limitado a 1 MB de RAM
-- Usado pela BIOS
-
-#### Protected Mode (32 bits)
-
-- Proteção de memória
-- Multitarefa
-- Acesso a mais de 1 MB de RAM
-- Usado por sistemas operacionais modernos
-
-#### Long Mode (64 bits)
-
-- Extensão do Protected Mode
-- Registradores de 64 bits
-- Mais memória endereçável
-
-## 2. Memória
-
-### 2.1. Pilha (Stack)
-
-A pilha é uma estrutura de dados LIFO (Last In, First Out) usada para:
-
-- Armazenar endereços de retorno de funções
-- Passar parâmetros para funções
-- Armazenar variáveis locais
-- Salvar estado de registradores
-
-#### Operações
-
-```assembly
-push eax    ; Coloca EAX na pilha (ESP -= 4)
-pop ebx     ; Remove topo da pilha para EBX (ESP += 4)
-```
-
-#### Crescimento
-
-A pilha cresce **para baixo** (de endereços altos para baixos):
+O x86 usa dois níveis de tradução de endereço:
 
 ```
-Endereços Altos
-    ↓
-[ESP] ← Topo da pilha
-[   ]
-[   ]
-[   ] ← Base da pilha
-    ↓
-Endereços Baixos
+Endereço virtual (32 bits):
+  [31:22] = índice no Page Directory  (10 bits → 1024 entradas)
+  [21:12] = índice na Page Table      (10 bits → 1024 entradas)
+  [11:0]  = offset dentro da página   (12 bits → 4096 bytes)
 ```
 
-### 2.2. Heap
+### Layout do espaço virtual do kernel
 
-Área de memória para alocação dinâmica:
-
-- Gerenciada por malloc/free (em C)
-- Cresce para cima (endereços crescentes)
-- Requer gerenciador de memória
-
-### 2.3. Segmentação
-
-Divisão da memória em segmentos lógicos:
-
-- **Code Segment**: Código executável
-- **Data Segment**: Dados
-- **Stack Segment**: Pilha
-
-### 2.4. Paginação
-
-Sistema de memória virtual que:
-
-- Divide memória em páginas (geralmente 4 KB)
-- Mapeia endereços virtuais para físicos
-- Permite proteção de memória
-- Facilita multitarefa
-
-## 3. Assembly x86
-
-### 3.1. Sintaxe NASM
-
-#### Diretivas
-
-```assembly
-global symbol    ; Exporta símbolo
-extern symbol    ; Importa símbolo
-section .text    ; Define seção
-equ             ; Define constante
+```
+0x00000000 – 0xBFFFFFFF  (3 GB) — espaço de usuário
+0xC0000000 – 0xC03FFFFF  (4 MB) — kernel (entrada 768 do PD)
+0xC0400000 – 0xC07FFFFF  (4 MB) — mapeamentos temporários (entrada 769)
+0xC1000000 – ...                 — heap do kernel
+0xC2000000 – ...                 — kernel stacks dos processos
 ```
 
-#### Instruções Básicas
+### Flags de uma PDE/PTE
 
-```assembly
-mov dest, src   ; Move dados
-add dest, src   ; Soma
-sub dest, src   ; Subtrai
-jmp label       ; Salta incondicionalmente
-call func       ; Chama função
-ret             ; Retorna de função
+| Bit | Flag | Significado |
+|-----|------|-------------|
+| 0 | Present | Página está na memória |
+| 1 | R/W | Leitura e escrita permitidas |
+| 2 | User | Acessível em ring 3 |
+| 7 | PSE | Página de 4MB (só em PDE) |
+
+## 4. Interrupções
+
+### Fluxo de uma interrupção de hardware
+
+```
+Hardware gera sinal
+       │
+       ▼
+PIC 8259A recebe o sinal (IRQ n)
+       │  traduz para vetor = n + 32 (após remap)
+       ▼
+CPU consulta IDT[vetor]
+       │  salva EIP, CS, EFLAGS na stack
+       │  se ring 3→0: também salva ESP, SS e troca para kernel stack (via TSS)
+       ▼
+Handler assembly (interrupts.s)
+       │  pushad + push ds/es
+       │  seta DS/ES para seletor do kernel (0x10)
+       ▼
+Handler C (keyboard_handler_c / pit_handler_c)
+       │
+       ▼
+EOI enviado ao PIC (out 0x20, 0x20)
+       │
+       ▼
+pop es/ds + popad + iretd
+       │  restaura EIP, CS, EFLAGS
+       │  se havia troca de ring: restaura ESP, SS
+       ▼
+Execução continua onde parou
 ```
 
-#### Tamanhos de Dados
+### Vetores usados
 
-- **byte**: 8 bits
-- **word**: 16 bits
-- **dword**: 32 bits (double word)
-- **qword**: 64 bits (quad word)
+| Vetor | IRQ | Fonte | Handler |
+|-------|-----|-------|---------|
+| 32 | IRQ0 | Timer PIT | `pit_handler_c` |
+| 33 | IRQ1 | Teclado PS/2 | `keyboard_handler_c` |
 
-### 3.2. Convenções de Chamada
+### Por que remapear o PIC?
 
-#### cdecl (C Declaration)
+Por padrão, o PIC mapeia IRQ0–IRQ7 para vetores 8–15, que conflitam com exceções da CPU (divisão por zero = vetor 0, page fault = vetor 14, etc.). O `pic_remap()` move IRQ0 para vetor 32, evitando conflitos.
 
-- Parâmetros empilhados da direita para esquerda
-- Chamador limpa a pilha
-- Retorno em EAX
-- Usado por compiladores C
+## 5. Task State Segment (TSS)
 
-## 4. Bootloader
+O TSS é necessário para interrupções em ring 3. Quando uma interrupção ocorre em user mode, a CPU precisa saber para qual stack do kernel trocar. Ela lê `ss0` e `esp0` do TSS.
 
-### 4.1. Função
+Neste projeto o TSS é usado apenas para manter `esp0` atualizado a cada troca de processo (via `tss_set_kernel_stack()`).
 
-O bootloader é responsável por:
+## 6. Convenção de Chamada cdecl
 
-1. Ser carregado pela BIOS
-2. Configurar ambiente básico
-3. Carregar o kernel na memória
-4. Transferir controle para o kernel
+Usada em todas as chamadas C/assembly:
 
-### 4.2. GRUB
+```
+Chamador:
+  push arg_n        ; argumentos da direita para esquerda
+  push arg_1
+  call func
+  add esp, n*4      ; limpa argumentos
 
-**GRUB (Grand Unified Bootloader)** é um bootloader flexível que:
-
-- Suporta múltiplos sistemas operacionais
-- Entende vários sistemas de arquivos
-- Implementa especificação Multiboot
-- Fornece menu de boot
-
-### 4.3. Multiboot
-
-Especificação que define:
-
-- Formato do cabeçalho do kernel
-- Informações passadas ao kernel
-- Estado do processador no boot
-
-## 5. Linker e Loader
-
-### 5.1. Linker (ld)
-
-Combina arquivos objeto em executável:
-
-- Resolve referências entre arquivos
-- Organiza seções na memória
-- Aplica relocações
-- Gera arquivo final (ELF)
-
-### 5.2. Linker Script
-
-Define:
-
-- Endereço de carregamento
-- Ordem das seções
-- Alinhamento de memória
-- Símbolos especiais
-
-### 5.3. Loader
-
-Carrega executável na memória:
-
-- Lê cabeçalho ELF
-- Mapeia seções na memória
-- Aplica relocações
-- Transfere controle ao entry point
-
-## 6. Compilação Freestanding
-
-### 6.1. O que é?
-
-Compilação **freestanding** significa compilar sem dependências do sistema operacional host.
-
-### 6.2. Flags Importantes
-
-```makefile
--nostdlib       # Não usa biblioteca padrão
--nostdinc       # Não usa headers padrão
--fno-builtin    # Desabilita funções built-in
--nostartfiles   # Não usa arquivos de inicialização
+Chamado:
+  push ebp          ; salva frame pointer
+  mov ebp, esp
+  ...
+  pop ebp
+  ret               ; retorno em EAX
 ```
 
-### 6.3. Implicações
+Registradores **callee-saved** (o chamado deve preservar): `ebp`, `ebx`, `esi`, `edi`
+Registradores **caller-saved** (pode ser destruído): `eax`, `ecx`, `edx`
 
-- Não há printf, malloc, etc.
-- Deve implementar tudo do zero
-- Controle total sobre o ambiente
-- Necessário para kernel
+## 7. I/O em x86
 
-## 7. Formato ELF
+O x86 tem um espaço de endereçamento separado para dispositivos de hardware, acessado com instruções especiais:
 
-### 7.1. Estrutura
+```nasm
+out 0x20, al    ; escreve AL na porta 0x20 (EOI do PIC)
+in  al, 0x60    ; lê da porta 0x60 (scancode do teclado)
+```
 
-- **ELF Header**: Metadados do arquivo
-- **Program Headers**: Como carregar na memória
-- **Section Headers**: Informações de debug/link
+Em C, usamos wrappers em assembly (`io.s`):
 
-### 7.2. Tipos de Seções
-
-- **.text**: Código executável
-- **.rodata**: Dados read-only
-- **.data**: Dados inicializados
-- **.bss**: Dados não inicializados
-
-## 8. Emulação vs Virtualização
-
-### 8.1. Bochs (Emulador)
-
-- Simula hardware x86 em software
-- Mais lento
-- Melhor para debug
-- Funciona em qualquer arquitetura
-
-### 8.2. QEMU/VirtualBox (Virtualização)
-
-- Executa código diretamente no processador
-- Mais rápido
-- Requer mesma arquitetura
-- Menos controle para debug
-
-## 9. Interrupções
-
-### 9.1. O que são?
-
-Sinais que pausam a execução normal para tratar eventos:
-
-- Hardware (teclado, timer)
-- Software (syscalls)
-- Exceções (divisão por zero)
-
-### 9.2. IDT (Interrupt Descriptor Table)
-
-Tabela que mapeia números de interrupção para handlers.
-
-### 10. Comunicação com Hardware (I/O)
-
-- I/O Ports: O x86 possui um espaço de endereçamento separado para hardware. Usamos outb para enviar comandos e inb para ler dados (ex: porta 0x60 para teclado).
-
-- Memory Mapped I/O (MMIO): Técnica onde o hardware mapeia seus registros em endereços de memória RAM comum. O Framebuffer (vídeo) usa isso em 0xB8000.
-
-### 11. O Fluxo de uma Interrupção
-- 1. Evento: Uma tecla é pressionada.
-- 2. PIC: O controlador de interrupções avisa a CPU através de um sinal elétrico.
-- 3. IDT: A CPU consulta esta tabela para achar o endereço do "Handler" (nosso código em C).
-- 4. Context Switch: A CPU salva o que estava fazendo, executa o driver do teclado e depois volta ao normal.
+```c
+void outb(unsigned short port, unsigned char data);
+unsigned char inb(unsigned short port);
+```

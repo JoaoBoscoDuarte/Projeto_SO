@@ -1,5 +1,6 @@
 #include "keyboard.h"
 #include "fb.h"
+#include "scheduler.h"
 
 extern void outb(unsigned short port, unsigned char data);
 extern unsigned char inb(unsigned short port);
@@ -62,9 +63,10 @@ void keyboard_handler_c(void)
  * ========================================================================== */
 char kbd_getchar(void)
 {
-    while (kbd_tail == kbd_head)
+    while (kbd_tail == kbd_head) {
+        yield();
         asm volatile("hlt");
-
+    }
     char c = kbd_buffer[kbd_tail];
     kbd_tail = (kbd_tail + 1) % KBD_BUFFER_SIZE;
     return c;
