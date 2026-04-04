@@ -45,7 +45,9 @@ OBJECTS = $(BUILD_DIR)/loader.o \
           $(BUILD_DIR)/paging.o \
 		  $(BUILD_DIR)/kheap.o \
           $(BUILD_DIR)/process.o \
-          $(BUILD_DIR)/usermode.o
+          $(BUILD_DIR)/usermode.o \
+          $(BUILD_DIR)/scheduler.o \
+          $(BUILD_DIR)/switch_s.o
 
 all: kernel.elf
 
@@ -179,6 +181,12 @@ $(BUILD_DIR)/process.o: $(SRC_DIR)/kernel/process.c
 	$(CC) $(CFLAGS) $< -o $@
 
 $(BUILD_DIR)/usermode.o: $(SRC_DIR)/boot/usermode.s
+	$(AS) $(ASFLAGS) $< -o $@
+
+$(BUILD_DIR)/scheduler.o: $(SRC_DIR)/kernel/scheduler.c
+	$(CC) $(CFLAGS) $< -o $@
+
+$(BUILD_DIR)/switch_s.o: $(SRC_DIR)/kernel/switch.s
 	$(AS) $(ASFLAGS) $< -o $@
 
 clean:

@@ -138,6 +138,7 @@ void kmain(unsigned int multiboot_addr,
     paging_init();
     pfa_init(kernel_physical_start, kernel_physical_end, mbinfo);
     kheap_init();
+    process_init();
 
     /* ------------------------------------------------------------------
      * 3. Inicialização de descritores, interrupções e I/O básico
@@ -254,7 +255,7 @@ void kmain(unsigned int multiboot_addr,
         kprintf(OUTPUT_FB, "Modulo: phys 0x%x - 0x%x (%d bytes)\n",
                 mod_start, mod_end, mod_size);
 
-        struct process proc = process_create(mod_start, mod_size);
+        struct process_legacy proc = process_create(mod_start, mod_size);
 
         if (proc.page_directory_phys == 0) {
             log_error("Falha ao criar processo user mode");
