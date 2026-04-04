@@ -54,7 +54,8 @@ static void cmd_help(void)
     kprintf(OUTPUT_FB, "  info   - informacoes do sistema\n");
     kprintf(OUTPUT_FB, "  spawn  - cria processo de teste (spawn [nome])\n");
     kprintf(OUTPUT_FB, "  kill   - mata um processo (kill <pid>)\n");
-    kprintf(OUTPUT_FB, "  reboot - reinicia o sistema\n");
+    kprintf(OUTPUT_FB, "  reboot   - reinicia o sistema\n");
+    kprintf(OUTPUT_FB, "  poweroff  - desliga o sistema\n");
 }
 
 static void cmd_ps(void)
@@ -86,11 +87,25 @@ static void cmd_info(void)
 static void cmd_reboot(void)
 {
     kprintf(OUTPUT_FB, "Reiniciando...\n");
-    /* Pulso no controlador de teclado 8042 para reset */
     outb(0x64, 0xFE);
-    /* Fallback: triple fault */
+    /* fallback: triple fault */
     asm volatile("lidt 0");
     asm volatile("int $0");
+}
+
+static void cmd_poweroff(void)
+{
+    kprintf(OUTPUT_FB, "Desligando...\n");
+    /* Bochs: escreve "Shutdown" na porta 0x8900 */
+    const char *s = "Shutdown";
+    while (*s)
+        outb(0x8900, (unsigned char)*s++);
+    /* QEMU/KVM: porta 0x604 */
+    outb(0x604, 0x00);
+    outb(0x604, 0x20);
+    /* fallback: halt */
+    asm volatile("cli");
+    while (1) asm volatile("hlt");
 }
 
 static void shell_execute(const char *cmd)
@@ -115,7 +130,8 @@ static void shell_execute(const char *cmd)
             kprintf(OUTPUT_FB, "uso: kill <pid>\n");
         }
     }
-    else if (strcmp(cmd, "reboot") == 0) cmd_reboot();
+    else if (strcmp(cmd, "reboot") == 0)   cmd_reboot();
+    else if (strcmp(cmd, "poweroff") == 0) cmd_poweroff();
     else if (strlen(cmd) > 0)
         kprintf(OUTPUT_FB, "comando desconhecido: %s\n", cmd);
 }
