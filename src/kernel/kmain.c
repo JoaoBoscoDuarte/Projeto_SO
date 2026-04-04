@@ -256,7 +256,7 @@ void kmain(unsigned int multiboot_addr,
 
         struct process proc = process_create(mod_start, mod_size);
 
-        if (proc.eip == 0) {
+        if (proc.page_directory_phys == 0) {
             log_error("Falha ao criar processo user mode");
         } else {
             kprintf(OUTPUT_FB, "Processo criado: eip=0x%x esp=0x%x pd=0x%x\n",
