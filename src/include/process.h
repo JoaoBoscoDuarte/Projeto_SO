@@ -39,6 +39,9 @@ typedef struct process {
     /* Contagem de tempo */
     unsigned int   ticks_total;         /* ticks de CPU consumidos         */
 
+    /* Memória alocada */
+    unsigned int   mem_frames;          /* frames físicos alocados         */
+
     /* Estado user-space salvo (para retorno ao ring 3) */
     unsigned int   user_eip;
     unsigned int   user_esp;

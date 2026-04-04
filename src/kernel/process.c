@@ -115,6 +115,7 @@ void process_init(void)
     process_table[0].pid         = 0;
     process_table[0].state       = PROC_RUNNING;
     process_table[0].ticks_total = 0;
+    process_table[0].mem_frames  = 0;
     str_copy_n(process_table[0].name, "kernel", PROC_NAME_LEN);
     current_process = &process_table[0];
 }
@@ -238,6 +239,7 @@ process_t *process_create_kernel(const char *name, void (*func)(void))
     proc->pid                 = pid;
     proc->state               = PROC_READY;
     proc->ticks_total         = 0;
+    proc->mem_frames          = 1;  /* 1 frame de kernel stack */
     proc->kernel_stack_base   = kstack_virt;
     proc->kernel_stack_top    = kstack_virt + KSTACK_SIZE;
     proc->esp                 = (unsigned int)sp;
@@ -380,6 +382,7 @@ process_t *process_create_full(const char *name,
     proc->pid                 = pid;
     proc->state               = PROC_READY;
     proc->ticks_total         = 0;
+    proc->mem_frames          = 4;  /* pd + code + stack_user + kstack */
     str_copy_n(proc->name, name ? name : "proc", PROC_NAME_LEN);
     proc->page_directory_phys = pd_phys;
     proc->kernel_stack_base   = kstack_virt;

@@ -163,6 +163,19 @@ unsigned int pfa_total_frames(void) {
     return total_frames;
 }
 
+unsigned int pfa_used_frames(void) {
+    unsigned int used = 0, i, word;
+    for (i = 0; i < bitmap_words; i++) {
+        word = bitmap[i];
+        while (word) { used += word & 1; word >>= 1; }
+    }
+    return used;
+}
+
+unsigned int pfa_free_frames(void) {
+    return total_frames - pfa_used_frames();
+}
+
 unsigned int pfa_bitmap_start(void) {
     return bitmap_phys_start;
 }

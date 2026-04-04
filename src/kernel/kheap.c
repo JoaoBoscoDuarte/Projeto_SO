@@ -164,3 +164,20 @@ void kfree(void *ptr)
         curr->next  = curr->next->next;
     }
 }
+
+unsigned int kheap_used_bytes(void)
+{
+    block_t *curr = heap_head;
+    unsigned int used = 0;
+    while (curr) {
+        if (!curr->free)
+            used += curr->size;
+        curr = curr->next;
+    }
+    return used;
+}
+
+unsigned int kheap_total_bytes(void)
+{
+    return heap_end - KHEAP_START;
+}

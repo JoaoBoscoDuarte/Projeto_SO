@@ -49,6 +49,7 @@ OBJECTS = $(BUILD_DIR)/loader.o \
           $(BUILD_DIR)/scheduler.o \
           $(BUILD_DIR)/switch_s.o \
           $(BUILD_DIR)/string.o \
+          $(BUILD_DIR)/cpuid.o \
           $(BUILD_DIR)/pit.o \
           $(BUILD_DIR)/shell.o \
           $(BUILD_DIR)/top.o
@@ -194,6 +195,9 @@ $(BUILD_DIR)/switch_s.o: $(SRC_DIR)/kernel/switch.s
 	$(AS) $(ASFLAGS) $< -o $@
 
 $(BUILD_DIR)/string.o: $(SRC_DIR)/lib/string.c
+	$(CC) $(CFLAGS) $< -o $@
+
+$(BUILD_DIR)/cpuid.o: $(SRC_DIR)/lib/cpuid.c
 	$(CC) $(CFLAGS) $< -o $@
 
 $(BUILD_DIR)/pit.o: $(SRC_DIR)/drivers/pit.c
