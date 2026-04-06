@@ -40,7 +40,9 @@ void schedule(void)
 
     /* Atualiza o TSS para que interrupções em ring 3 usem a kernel stack
      * correta do processo que está prestes a executar. */
-    tss_set_kernel_stack(next->kernel_stack_top);
+    if (next->kernel_stack_top != 0) {
+        tss_set_kernel_stack(next->kernel_stack_top);
+    }
 
     /* Troca de contexto — salva old->esp, carrega next->esp */
     current_process = next;
