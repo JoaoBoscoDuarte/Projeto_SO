@@ -21,6 +21,9 @@ static process_t *find_next_ready(void)
     return (process_t *)0;
 }
 
+/* ============================================================================
+ * schedule — troca de contexto para o próximo processo pronto
+ * ========================================================================== */
 void schedule(void)
 {
     process_t *next;
@@ -34,8 +37,20 @@ void schedule(void)
 
     old->state  = PROC_READY;
     next->state = PROC_RUNNING;
+
+    /* Atualiza o TSS para que interrupções em ring 3 usem a kernel stack
+     * correta do processo que está prestes a executar. */
     tss_set_kernel_stack(next->kernel_stack_top);
+
+    /* Troca de contexto — salva old->esp, carrega next->esp */
     current_process = next;
+
+    /* Se os processos tiverem mapas de memória diferentes, trocamos o CR3 */
+    if (old->page_directory_phys != next->page_directory_phys) {
+        asm volatile("mov %0, %%cr3" : : "r"(next->page_directory_phys));
+    }
+
+    /* Salta para a nova pilha (chama o seu switch.s) */
     context_switch(&old->esp, next->esp);
 }
 

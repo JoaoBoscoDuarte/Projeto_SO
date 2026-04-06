@@ -3,6 +3,14 @@
 #include "pfa.h"
 #include "scheduler.h"
 
+/* Esta é a primeira coisa que um processo executa ao "nascer" */
+static void process_start_stub(void) {
+    /* Como o CR3 já foi trocado pelo scheduler, basta ir para ring 3! */
+    enter_usermode(current_process->user_eip, 
+                   current_process->user_esp, 
+                   current_process->page_directory_phys);
+}
+
 /* page_directory definido em loader.s — PD do kernel ativo em CR3 */
 extern pde_t page_directory[1024];
 
@@ -402,8 +410,25 @@ process_t *process_create_full(const char *name,
     proc->esp                 = proc->kernel_stack_top;
     proc->ebp                 = proc->kernel_stack_top;
 
+    /* --- INÍCIO DA FORJA DA PILHA --- */
+    unsigned int *stack = (unsigned int *)proc->esp;
+
+    /* Empurra o endereço da função inicial (para onde o 'ret' do switch vai saltar) */
+    *(--stack) = (unsigned int)process_start_stub;
+
+    /* Empurra 4 zeros para fingir que salvamos EBP, EBX, ESI e EDI */
+    *(--stack) = 0; /* ebp */
+    *(--stack) = 0; /* ebx */
+    *(--stack) = 0; /* esi */
+    *(--stack) = 0; /* edi */
+
+    /* Atualiza o ESP final do PCB para apontar para o topo desta pilha forjada */
+    proc->esp = (unsigned int)stack;
+    /* --- FIM DA FORJA --- */
+
     return proc;
 }
+
 
 /* ============================================================================
  * process_create — API legada do Capítulo 11 (mantida para kmain.c)
