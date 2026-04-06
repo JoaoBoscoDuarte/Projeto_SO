@@ -7,6 +7,11 @@ extern unsigned char inb(unsigned short port);
 
 /* ============================================================================
  * Mapa de scancodes US QWERTY → ASCII (make codes apenas; ignore 0x80+)
+ * ============================================================================
+ *
+ * OBS:
+ * Este mapa continua simples e baseado em layout US.
+ * As teclas de seta continuam sendo tratadas separadamente via prefixo E0.
  * ========================================================================== */
 static unsigned char kbd_map[128] = {
     0,   27,  '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\b',
@@ -26,6 +31,14 @@ static unsigned char kbd_map[128] = {
 static volatile char         kbd_buffer[KBD_BUFFER_SIZE];
 static volatile unsigned int kbd_head = 0;
 static volatile unsigned int kbd_tail = 0;
+
+/* ============================================================================
+ * Prefixo de scancode estendido
+ *
+ * Quando chega 0xE0, a próxima leitura representa uma tecla estendida,
+ * como as setas.
+ * ========================================================================== */
+static volatile unsigned char e0_prefix = 0;
 
 static void kbd_buffer_put(char c)
 {
@@ -47,14 +60,52 @@ void keyboard_handler_c(void)
 {
     unsigned char scancode = inb(0x60);
 
+
+    // Detecta prefixo E0
+    if (scancode == 0xE0) {
+        e0_prefix = 1;
+        return;
+    }
+
+    // Se estava aguardando o segundo byte de um scancode estendido 
+    if (e0_prefix) {
+        e0_prefix = 0;
+
+        // ignora releases estendidos 
+        if (scancode & 0x80)
+            return;
+
+        switch (scancode) {
+            case 0x48: // seta para cima 
+                kbd_buffer_put(27);  // ESC 
+                kbd_buffer_put('[');
+                kbd_buffer_put('A');
+                return;
+
+            case 0x50: // seta para baixo 
+                kbd_buffer_put(27);  // ESC
+                kbd_buffer_put('[');
+                kbd_buffer_put('B');
+                return;
+
+            default:
+                return;
+        }
+    }
+
     /* Ignora break codes (bit 7 = 1) */
     if (scancode & 0x80)
         return;
 
     if (scancode < 128) {
         char c = (char)kbd_map[scancode];
-        if (c != 0)
-            kbd_buffer_put(c);
+
+        if (c == 0)
+        return;
+
+        /* comportamento normal: tecla comum vai direto para o buffer */
+        kbd_buffer_put((char)c);
+
     }
 }
 

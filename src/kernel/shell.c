@@ -11,6 +11,33 @@
 
 extern void outb(unsigned short port, unsigned char data);
 
+/* =========================================================
+ * [NOVO] Configuracoes do historico do shell
+ * ---------------------------------------------------------
+ * SHELL_MAX_LINE:
+ *   tamanho maximo da linha que o shell edita localmente.
+ *
+ * SHELL_HISTORY_SIZE:
+ *   quantidade maxima de comandos guardados no historico.
+ * =========================================================
+ */
+#define SHELL_MAX_LINE     128
+#define SHELL_HISTORY_SIZE 16
+
+/* =========================================================
+ * [NOVO] Buffer de historico
+ * ---------------------------------------------------------
+ * shell_history:
+ *   guarda os ultimos comandos digitados.
+ *
+ * shell_history_count:
+ *   quantidade atual de comandos validos armazenados.
+ * =========================================================
+ */
+static char shell_history[SHELL_HISTORY_SIZE][SHELL_MAX_LINE];
+static unsigned int shell_history_count = 0;
+
+
 static const char *state_name(proc_state_t s)
 {
     switch (s) {
@@ -141,13 +168,258 @@ static void shell_execute(const char *cmd)
         kprintf(OUTPUT_FB, "comando desconhecido: %s\n", cmd);
 }
 
+/* =========================================================
+ * [NOVO] Salva um comando no historico
+ * ---------------------------------------------------------
+ * Regras:
+ * - nao salva linha vazia
+ * - nao duplica o ultimo comando imediatamente anterior
+ * - se o historico encher, descarta o mais antigo
+ * =========================================================
+ */
+static void shell_history_push(const char *cmd)
+{
+    unsigned int i;
+
+    if (!cmd || cmd[0] == '\0')
+        return;
+
+    /* evita repetir o ultimo comando duas vezes seguidas */
+    if (shell_history_count > 0 &&
+        strcmp(shell_history[shell_history_count - 1], cmd) == 0)
+        return;
+
+    /* se ainda ha espaco, adiciona no final */
+    if (shell_history_count < SHELL_HISTORY_SIZE) {
+        strcpy(shell_history[shell_history_count], cmd);
+        shell_history_count++;
+        return;
+    }
+
+    /* se encheu, desloca tudo uma posicao para cima */
+    for (i = 1; i < SHELL_HISTORY_SIZE; i++)
+        strcpy(shell_history[i - 1], shell_history[i]);
+
+    strcpy(shell_history[SHELL_HISTORY_SIZE - 1], cmd);
+}
+
+/* =========================================================
+ * [NOVO] Reescreve a linha atual do shell na tela
+ * ---------------------------------------------------------
+ * Essa funcao eh usada quando o usuario aperta seta para
+ * cima/baixo e o shell precisa trocar o comando atual pelo
+ * comando do historico.
+ *
+ * row:
+ *   linha da tela onde o comando esta sendo editado
+ *
+ * start_col:
+ *   coluna onde comeca a area digitavel (logo apos "kernel> ")
+ *
+ * buf:
+ *   conteudo novo a ser mostrado
+ *
+ * old_len:
+ *   tamanho do comando antigo, para conseguir apagar sobras
+ * =========================================================
+ */
+static void shell_redraw_line(
+    unsigned int row,
+    unsigned int start_col,
+    const char *buf,
+    unsigned int old_len)
+{
+    unsigned int i;
+    unsigned int new_len = strlen(buf);
+
+    /* apaga o conteudo antigo */
+    for (i = 0; i < old_len; i++) {
+        fb_write_at(row, start_col + i, ' ', FB_LIGHT_GREY, FB_BLACK);
+    }
+
+    /* escreve o novo conteudo */
+    for (i = 0; i < new_len; i++) {
+        fb_write_at(row, start_col + i, buf[i], FB_LIGHT_GREY, FB_BLACK);
+    }
+
+    /* posiciona o cursor no fim do texto novo */
+    fb_set_cursor(row, start_col + new_len);
+}
+
+/* =========================================================
+ * [NOVO] Leitura de linha do shell com suporte a historico
+ * ---------------------------------------------------------
+ * Esta funcao substitui o uso direto de kbd_readline().
+ *
+ * Ela continua tratando:
+ * - caracteres comuns
+ * - backspace
+ * - enter
+ *
+ * E agora tambem trata:
+ * - ESC [ A  -> seta para cima
+ * - ESC [ B  -> seta para baixo
+ *
+ * Observacao:
+ * isso depende do driver de teclado transformar as setas
+ * nessas sequencias.
+ * =========================================================
+ */
+static int shell_readline(char *buf, unsigned int max_len)
+{
+    unsigned int i = 0;
+
+    /* guarda a posicao em que o usuario comeca a digitar */
+    unsigned int row = fb_get_cursor_row();
+    unsigned int start_col = fb_get_cursor_col();
+
+    /* old_len serve para apagar completamente a linha anterior
+       quando navegarmos pelo historico */
+    unsigned int old_len = 0;
+
+    /* hist_index:
+     * - começa "apos o fim" do historico
+     * - quando sobe, vai para comandos antigos
+     * - quando desce, volta para comandos mais novos
+     */
+    int hist_index = (int)shell_history_count;
+
+    /* current_edit guarda o que o usuario estava digitando antes
+       de entrar na navegacao do historico */
+    char current_edit[SHELL_MAX_LINE];
+
+    if (!buf || max_len == 0)
+        return 0;
+
+    buf[0] = '\0';
+    current_edit[0] = '\0';
+
+    while (1) {
+        char c = kbd_getchar();
+
+        /* ENTER finaliza a linha */
+        if (c == '\n') {
+            buf[i] = '\0';
+            fb_putchar('\n');
+            return (int)i;
+        }
+
+        /* BACKSPACE apaga um caractere, se existir */
+        if (c == '\b') {
+            if (i > 0) {
+                i--;
+                buf[i] = '\0';
+                fb_putchar('\b');
+                old_len = i;
+            }
+            continue;
+        }
+
+        /* =====================================================
+         * [NOVO] Tratamento das sequencias de escape das setas
+         * -----------------------------------------------------
+         * ESC [ A = seta para cima
+         * ESC [ B = seta para baixo
+         * =====================================================
+         */
+        if (c == 27) { /* ESC */
+            char c1 = kbd_getchar();
+            char c2 = kbd_getchar();
+
+            if (c1 == '[' && c2 == 'A') {
+                /* ---------- SETA PARA CIMA ----------
+                 * Vai para um comando mais antigo.
+                 */
+
+                if (shell_history_count > 0) {
+                    /* ao entrar no historico pela primeira vez,
+                       salvamos o que o usuario estava digitando */
+                    if (hist_index == (int)shell_history_count)
+                        strcpy(current_edit, buf);
+
+                    if (hist_index > 0)
+                        hist_index--;
+
+                    strcpy(buf, shell_history[hist_index]);
+                    i = strlen(buf);
+
+                    shell_redraw_line(row, start_col, buf, old_len);
+                    old_len = i;
+                }
+                continue;
+            }
+
+            if (c1 == '[' && c2 == 'B') {
+                /* ---------- SETA PARA BAIXO ----------
+                 * Vai para um comando mais novo.
+                 */
+
+                if (hist_index < (int)shell_history_count - 1) {
+                    hist_index++;
+                    strcpy(buf, shell_history[hist_index]);
+                } else if (hist_index == (int)shell_history_count - 1) {
+                    /* se estava no ultimo item do historico e descer,
+                       volta para o texto que o usuario estava editando */
+                    hist_index = (int)shell_history_count;
+                    strcpy(buf, current_edit);
+                } else {
+                    /* ja esta fora do historico; nao faz nada */
+                    continue;
+                }
+
+                i = strlen(buf);
+
+                shell_redraw_line(row, start_col, buf, old_len);
+                old_len = i;
+                continue;
+            }
+
+            /* qualquer outra sequencia ESC eh ignorada */
+            continue;
+        }
+
+        /* caractere comum */
+        if (i < max_len - 1) {
+            buf[i++] = c;
+            buf[i] = '\0';
+            fb_putchar(c);
+            old_len = i;
+        }
+    }
+}
+
 void shell_run(void)
 {
     char buf[128];
+
     kprintf(OUTPUT_FB, "\nBem-vindo ao Mini-Shell! Digite 'help' para ajuda.\n\n");
+
     while (1) {
         kprintf(OUTPUT_FB, "kernel> ");
-        kbd_readline(buf, sizeof(buf));
+
+        /* =====================================================
+         * [ALTERADO]
+         * Antes:
+         *   kbd_readline(buf, sizeof(buf));
+         *
+         * Agora:
+         *   shell_readline(buf, sizeof(buf));
+         *
+         * Motivo:
+         *   agora quem controla a leitura da linha eh o shell,
+         *   para conseguir tratar historico e setas.
+         * =====================================================
+         */
+        shell_readline(buf, sizeof(buf));
+
+        /* =====================================================
+         * [NOVO]
+         * Salva o comando no historico antes de executar.
+         * Nao salva linha vazia e nao duplica o ultimo.
+         * =====================================================
+         */
+        shell_history_push(buf);
+
         shell_execute(buf);
     }
 }
