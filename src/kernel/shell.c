@@ -51,6 +51,7 @@ static const char *state_name(proc_state_t s)
 }
 
 /* Processo de teste: loop de CPU puro, cede a cada 50000 iteracoes */
+/*
 static void worker_proc(void)
 {
     volatile unsigned int counter = 0;
@@ -63,6 +64,20 @@ static void worker_proc(void)
                 counter, pit_get_ticks());
             yield();
         }
+    }
+}
+*/
+// processo de teste mais simples, apenas para debugg.
+static void worker_proc(void)
+{
+    volatile unsigned int counter = 0;
+
+    while (1) {
+        counter++;
+
+        /* apenas cede a CPU periodicamente */
+        if (counter % 50000 == 0)
+            yield();
     }
 }
 

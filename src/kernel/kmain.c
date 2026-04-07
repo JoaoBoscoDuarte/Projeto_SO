@@ -75,13 +75,10 @@ void kmain(unsigned int multiboot_addr,
 
     asm volatile("sti");
 
-    /* 1. Criamos os processos PRIMEIRO */
-    //process_create_kernel("taskA", task_a);
-    //process_create_kernel("taskB", task_b);
-
+    /*Cria o shell como processo*/
     shell_run();
 
-    /* 3. O kmain (PID 0) vai dormir, deixando A e B lutarem pelo CPU */
+    /* O kmain (PID 0) vai dormir, deixando A e B lutarem pelo CPU */
     while (1) {
         asm volatile("hlt");
     }

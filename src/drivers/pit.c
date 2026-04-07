@@ -23,17 +23,14 @@ void pit_init(unsigned int freq_hz)
 void pit_handler_c(void)
 {
     system_ticks++;
-    if (current_process)
+    if (current_process && current_process->state == PROC_RUNNING)
         current_process->ticks_total++;
 
     /* Envia o aviso (EOI) ao PIC ANTES de trocar de contexto! 
        Se o fizer depois, o timer bloqueia no outro processo. */
     outb(0x20, 0x20);
 
-    /* PREEMPÇÃO: Força o CPU a passar para o próximo processo */
-    if (system_ticks % PREEMPT_INTERVAL == 0) {
-        schedule();
-    }
+    
 }
 
 unsigned int pit_get_ticks(void)

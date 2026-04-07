@@ -1,6 +1,6 @@
 # 09 - Histórico de comandos no shell
 
-## 🧾 Resumo da Mudança
+## Resumo da Mudança
 
 Foi implementado suporte a histórico de comandos no shell, permitindo navegar entre comandos previamente executados utilizando as teclas de seta para cima e para baixo.
 
@@ -8,7 +8,7 @@ A solução foi construída diretamente no shell.c, sem modificar a interface do
 
 ---
 
-## 🎯 Objetivo
+## Objetivo
 
 Adicionar uma funcionalidade básica de linha de comando interativa, permitindo:
 
@@ -20,7 +20,7 @@ Adicionar uma funcionalidade básica de linha de comando interativa, permitindo:
 
 ---
 
-## 🧠 Justificativa
+## Justificativa
 
 O shell original apenas aceitava entrada linear via kbd_readline, sem qualquer mecanismo de edição ou histórico.
 
@@ -36,7 +36,7 @@ O shell interpreta comportamento.
 
 ---
 
-## ⚙️ Detalhes Técnicos
+## Detalhes Técnicos
 
 ### 1. Estrutura de histórico
 
@@ -183,7 +183,7 @@ As setas foram mapeadas para sequências compatíveis:
 
 ---
 
-## 🧪 Exemplos
+## Exemplos
 
 Entrada:
 
@@ -213,7 +213,7 @@ Entrada parcial:
 
 ---
 
-## ⚠️ Limitações
+## Limitações
 
 - sem edição no meio da linha
 - sem setas esquerda/direita
@@ -221,7 +221,7 @@ Entrada parcial:
 
 ---
 
-## ✅ Resultado
+## Resultado
 
 - histórico funcional
 - navegação com setas implementada

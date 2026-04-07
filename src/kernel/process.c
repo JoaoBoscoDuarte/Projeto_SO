@@ -187,6 +187,28 @@ void process_exit(void)
         current_process->state = PROC_ZOMBIE;
 }
 
+/* Stub de entrada para processos kernel */
+static void kernel_process_start_stub(void)
+{
+    void (*entry)(void);
+
+    /* A função real do processo foi salva no PCB */
+    entry = (void (*)(void))current_process->eip;
+
+    /* Garante que timer/teclado continuem funcionando */
+    asm volatile("sti");
+
+    /* Executa a função real do processo */
+    entry();
+
+    /* Se a função retornar, encerra o processo */
+    process_exit();
+
+    /* Nunca volta */
+    while (1)
+        yield();
+}
+
 /* ============================================================================
  * process_create_kernel — cria processo ring 0 a partir de uma função C
  *
@@ -247,7 +269,7 @@ process_t *process_create_kernel(const char *name, void (*func)(void))
      *   esi = 0   ← popado por pop esi
      *   edi = 0   ← popado por pop edi  ← ESP aponta aqui
      */
-    *(--sp) = (unsigned int)func; /* ret addr */
+    *(--sp) = (unsigned int)kernel_process_start_stub; /* ret addr */
     *(--sp) = 0;                  /* ebp */
     *(--sp) = 0;                  /* ebx */
     *(--sp) = 0;                  /* esi */
