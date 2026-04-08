@@ -64,13 +64,13 @@ install_debian() {
 
 verify_tools() {
     info "Verificando ferramentas instaladas..."
-    local ok=1
+    local ok=0
     for tool in gcc nasm ld make grub-mkrescue xorriso bochs; do
         if command -v "$tool" &>/dev/null; then
             echo "  ✓ $tool ($(command -v $tool))"
         else
             warn "  ✗ $tool não encontrado"
-            ok=0
+            ok=1
         fi
     done
 
@@ -79,7 +79,7 @@ verify_tools() {
         echo "  ✓ gcc -m32 (compilação 32-bit OK)"
     else
         warn "  ✗ gcc -m32 falhou — instale gcc-multilib"
-        ok=0
+        ok=1
     fi
 
     return $ok
