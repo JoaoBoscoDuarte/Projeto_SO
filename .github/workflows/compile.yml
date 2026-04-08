@@ -6,10 +6,14 @@ on:
       - main
     paths-ignore:
       - '*.md'
-
   pull_request:
     branches:
       - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - closed
     paths-ignore:
       - '*.md'
 
@@ -28,7 +32,7 @@ jobs:
         run: make os.iso
 
       - name: Upload ISO artifact
-        if: github.event_name == 'push'
+        if: github.event.pull_request.merged == true
         uses: actions/upload-artifact@v4
         with:
           name: os.iso
@@ -37,7 +41,7 @@ jobs:
   release:
     name: Release
     needs: compile
-    if: github.event_name == 'push'
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -53,7 +57,8 @@ jobs:
           tag_name: build-${{ github.run_number }}
           name: "Build #${{ github.run_number }}"
           body: |
+            PR: #${{ github.event.pull_request.number }} — ${{ github.event.pull_request.title }}
+            Merged by: ${{ github.event.pull_request.merged_by.login }}
             Commit: ${{ github.sha }}
-            Branch: ${{ github.ref_name }}
           files: os.iso
           fail_on_unmatched_files: true
