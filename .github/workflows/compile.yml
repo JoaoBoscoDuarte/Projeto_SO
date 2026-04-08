@@ -1,21 +1,20 @@
 name: Compile
 
 on:
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - '*.md'
-
   pull_request:
     branches:
       - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - closed
     paths-ignore:
       - '*.md'
 
 jobs:
-  compile-test:
-    name: Compile Test
+  compile:
+    name: Compile
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -23,10 +22,38 @@ jobs:
 
       - name: Install dependencies
         run: ./install_deps.sh
-      
+
       - name: Compile
         run: make os.iso
 
-      - name: Clean
-        run: make clean
-    
+      - name: Upload ISO artifact
+        if: github.event.pull_request.merged == true
+        uses: actions/upload-artifact@v4
+        with:
+          name: os.iso
+          path: os.iso
+
+  release:
+    name: Release
+    needs: compile
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download ISO artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: os.iso
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: "Build #${{ github.run_number }}"
+          body: |
+            PR: #${{ github.event.pull_request.number }} — ${{ github.event.pull_request.title }}
+            Merged by: ${{ github.event.pull_request.merged_by.login }}
+            Commit: ${{ github.sha }}
+          files: os.iso
+          fail_on_unmatched_files: true
