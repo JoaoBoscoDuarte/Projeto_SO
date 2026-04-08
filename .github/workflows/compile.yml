@@ -32,7 +32,7 @@ jobs:
         run: make os.iso
 
       - name: Upload ISO artifact
-        if: github.event.pull_request.merged == true
+        if: github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
           name: os.iso
@@ -41,7 +41,7 @@ jobs:
   release:
     name: Release
     needs: compile
-    if: github.event.pull_request.merged == true
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
