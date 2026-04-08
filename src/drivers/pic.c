@@ -25,9 +25,8 @@ void pic_remap(void) {
     outb(PIC2_DATA, 0x01);
 
     // 5. MÁSCARAS DE INTERRUPÇÃO (O ponto crucial!)
-    // 0xFD = 11111101 em binário. 
-    // Isso desativa o Timer (Bit 0) e ativa apenas o Teclado (Bit 1).
-    outb(PIC1_DATA, 0xFD); 
+    // 0xFC = 11111100 — habilita IRQ0 (timer) e IRQ1 (teclado)
+    outb(PIC1_DATA, 0xFC); 
     
     // Desativa todas as interrupções do PIC escravo
     outb(PIC2_DATA, 0xFF); 
