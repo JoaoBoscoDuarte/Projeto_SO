@@ -121,7 +121,7 @@ GDT, PFA, shell, comandos (help, clear, ps, top, info, kill, reboot, poweroff)
 
 
 
-Recebimento do teclado, paginação, higher half linker, troca de contexto por timer
+Recebimento do teclado, paginação, higher half linker, escalonador preemptivo
 </td>
 <td align="center" valign="top" width="25%">
 <a href="https://github.com/Marcus-Vin">
@@ -133,7 +133,7 @@ Recebimento do teclado, paginação, higher half linker, troca de contexto por t
 
 
 
-User mode, GitHub CI, PCB, funções
+User mode, GitHub CI, PCB, funções, processos
 </td>
 <td align="center" valign="top" width="25%">
 <a href="https://github.com/SamSantosidc">
