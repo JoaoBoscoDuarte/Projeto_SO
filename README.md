@@ -109,7 +109,7 @@ Contribuidores
 
 
 
-GDT, PFA, shell, comandos (help, clear, ps, top, info, spawn, kill, reboot, poweroff)
+GDT, PFA, shell, comandos (help, clear, ps, top, info, kill, reboot, poweroff)
 </td>
 <td align="center" valign="top" width="25%">
 <a href="https://github.com/guilopeszw">
