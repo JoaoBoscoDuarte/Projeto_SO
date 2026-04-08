@@ -1,24 +1,45 @@
-    [BITS 32]
-    ; =========================================================================
-    ; Verifica que está executando em ring 3 lendo o seletor CS:
-    ;   CS = 0x1B (0001 1011b) → índice=3, TI=0 (GDT), RPL=3 → ring 3
-    ;   CS = 0x08 (0000 1000b) → índice=1, TI=0 (GDT), RPL=0 → ring 0
-    ;
-    ; Para verificar no Bochs/QEMU:
-    ;   - Para a execução e inspeciona os registradores
-    ;   - EAX = 0xDEADBEEF confirma que o código executou
-    ;   - ECX = 0x0000001B confirma ring 3 (CS com RPL=3)
-    ;   - CS  = 0x001B      confirma o seletor de código user
-    ; =========================================================================
+; =============================================================================
+; program.s — Módulo de teste carregado pelo GRUB como Multiboot module
+;
+; PROPÓSITO:
+;   Este binário é carregado pelo GRUB como um "módulo Multiboot" separado
+;   do kernel. O kmain() recebe o endereço físico deste módulo via
+;   multiboot_info_t.mods_addr e pode executá-lo diretamente.
+;
+; FORMATO:
+;   Compilado como binário plano (-f bin), sem cabeçalho ELF.
+;   O GRUB carrega os bytes brutos em memória e o kernel salta para
+;   o primeiro byte — que deve ser uma instrução válida.
+;
+; COMO É CARREGADO:
+;   No Makefile:
+;     nasm -f bin program.s -o build/program
+;   Na ISO:
+;     grub.cfg: module /modules/program
+;   No kmain.c:
+;     unsigned int module_virt = mods[0].mod_start + 0xC0000000;
+;     call_module_t start = (call_module_t) module_virt;
+;     start();
+;
+; VERIFICAÇÃO EM RUNTIME:
+;   - EAX = 0xDEADBEEF confirma que o módulo executou (visível no log serial)
+;   - ECX = 0x1B confirma execução em ring 3 (CS com RPL=3)
+;   - ECX = 0x08 indicaria ring 0 (CS com RPL=0)
+;
+; =============================================================================
 
-    mov eax, 0xDEADBEEF     ; marcador visível no log do emulador
+[BITS 32]
 
-    ; Lê o seletor CS atual e salva em ECX para inspeção
-    ; Se estiver em ring 3: ECX = 0x1B
-    ; Se estiver em ring 0: ECX = 0x08
+    ; Marcador visível no log do emulador e na porta serial.
+    ; Facilita confirmar que o módulo foi carregado e executado.
+    mov eax, 0xDEADBEEF
+
+    ; Lê o seletor de código atual (CS) para verificar o nível de privilégio.
+    ;   CS = 0x1B (RPL=3) → executando em ring 3 (user mode)
+    ;   CS = 0x08 (RPL=0) → executando em ring 0 (kernel mode)
     mov ecx, cs
 
-    ; Loop infinito — o programa não deve retornar
-    ; (não há nada para retornar: não há libc, não há syscall de exit)
+    ; Loop infinito (não há para onde retornar).
+    ; O kernel não espera retorno deste módulo.
 .loop:
     jmp .loop

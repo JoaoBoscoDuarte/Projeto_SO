@@ -62,6 +62,20 @@ make docker-run     # compila + executa com QEMU headless
 make docker-shell   # shell interativo no container
 ```
 
+### Via VM ou Hardware Real
+
+A ISO gerada é uma imagem híbrida bootável em qualquer ambiente:
+
+```bash
+# QEMU
+qemu-system-i386 -cdrom os.iso -serial stdio -no-reboot
+
+# Pendrive (hardware real — BIOS legacy)
+sudo dd if=os.iso of=/dev/sdX bs=4M status=progress
+```
+
+VirtualBox e VMware também funcionam sem configuração especial. Veja [docs/08-como-rodar.md](docs/08-como-rodar.md).
+
 ## Documentação
 
 A pasta `docs/` contém a documentação técnica completa:

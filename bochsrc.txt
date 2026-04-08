@@ -1,19 +1,55 @@
-megs:            32
+# =============================================================================
+# bochsrc.txt — Configuração do emulador Bochs
+#
+# Usado pelo target 'make run'.
+# Documentação completa: https://bochs.sourceforge.io/doc/docbook/user/bochsrc.html
+# =============================================================================
+
+# Quantidade de RAM emulada (em MB).
+# 32 MB é suficiente para o kernel + heap + stacks de processos.
+megs: 32
+
+# Backend gráfico para exibir o framebuffer VGA.
+# 'x' usa X11 (Linux com servidor gráfico).
+# Alternativas: sdl2, win32, nogui (headless).
 display_library: x
+
+# Desabilita emulação de mouse — não implementado no kernel.
 mouse: enabled=0
 
+# Imagem da BIOS principal (firmware que inicializa o hardware antes do GRUB).
 romimage: file="/usr/share/bochs/BIOS-bochs-latest"
+
+# Imagem da BIOS de vídeo (VGA BIOS — inicializa o modo texto 80x25).
 vgaromimage: file="/usr/share/bochs/VGABIOS-lgpl-latest"
 
+# Dispositivo ATA0 master: CD-ROM com a imagem ISO do kernel.
+# O GRUB está gravado na ISO e carrega o kernel.elf automaticamente.
 ata0-master: type=cdrom, path=os.iso, status=inserted
+
+# Ordem de boot: tenta o CD-ROM primeiro.
 boot: cdrom
 
+# Arquivo de log do Bochs (eventos internos do emulador, não do kernel).
+# A saída serial do kernel vai para com1 abaixo.
 log: logs/bochslog.txt
+
+# Ações para cada nível de severidade do log interno do Bochs.
+# 'report' = registra no arquivo de log sem parar a emulação.
 panic: action=report
 error: action=report
-info: action=report
+info:  action=report
 
+# Porta serial COM1 redirecionada para arquivo.
+# O kernel escreve logs de debug via serial (kprintf(OUTPUT_SERIAL, ...)).
+# Leia com: cat logs/com1.out
 com1: enabled=1, mode=file, dev=logs/com1.out
 
-clock:           sync=realtime, time0=local
-cpu:             count=1, ips=1000000
+# Relógio sincronizado com o tempo real do host.
+# time0=local: inicializa com a hora local do sistema.
+clock: sync=realtime, time0=local
+
+# Configuração da CPU emulada.
+# count=1: single-core (scheduler cooperativo não precisa de SMP).
+# ips=1000000: instruções por segundo — afeta velocidade da emulação.
+cpu: count=1, ips=1000000
