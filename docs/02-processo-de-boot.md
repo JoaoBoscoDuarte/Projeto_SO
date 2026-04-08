@@ -1,175 +1,139 @@
-# Processo de Boot do Sistema Operacional
+# 02 — Processo de Boot
 
 ## Visão Geral
 
-Este documento explica detalhadamente como o sistema operacional é carregado e inicializado, desde o momento em que o computador é ligado até a execução do kernel.
-
-## Etapas do Boot
-
-### 1. Power-On e BIOS
-
-Quando o computador é ligado:
-
-1. **POST (Power-On Self Test)**: BIOS verifica o hardware
-2. **Busca de Bootloader**: BIOS procura por dispositivos bootáveis
-3. **Carregamento do GRUB**: BIOS carrega o primeiro estágio do GRUB do CD/ISO
-
-### 2. GRUB (Grand Unified Bootloader)
-
-O GRUB é responsável por:
-
-- Ler o arquivo de configuração `menu.lst`
-- Apresentar menu de boot (se configurado)
-- Carregar o kernel na memória
-- Transferir controle para o kernel
-
-#### Configuração do GRUB (`menu.lst`)
-
 ```
-default=0
-timeout=0
-
-title os
-kernel /boot/kernel.elf
+Liga o PC
+   │
+   ▼
+BIOS (POST + busca dispositivo bootável)
+   │
+   ▼
+GRUB (lê grub.cfg, carrega kernel.elf em 0x00100000)
+   │
+   ▼
+loader.s (executa em 0x00100000, paginação DESLIGADA)
+   │  1. Carrega CR3 com endereço físico do page_directory
+   │  2. Habilita PSE (páginas 4MB) em CR4
+   │  3. Liga paginação em CR0
+   │  4. Salta para endereço virtual alto (0xC010xxxx)
+   │  5. Remove identity map (entrada 0 do PD)
+   │  6. Flush TLB (reload CR3)
+   │  7. Configura ESP para kernel_stack
+   │  8. Empurra argumentos e chama kmain()
+   │
+   ▼
+kmain() — inicializa subsistemas em ordem obrigatória
+   │
+   ▼
+shell_run() — loop infinito aguardando comandos
 ```
 
-- **default=0**: Primeira opção é padrão
-- **timeout=0**: Sem espera, boot imediato
-- **kernel /boot/kernel.elf**: Localização do kernel
+## 1. GRUB e Multiboot
 
-### 3. Multiboot
+O GRUB carrega o kernel baseado no cabeçalho Multiboot presente nos primeiros 8 KB do binário:
 
-O **Multiboot** é uma especificação que padroniza a interface entre bootloaders e kernels.
-
-#### Cabeçalho Multiboot
-
-O kernel deve ter um cabeçalho especial nos primeiros 8 KB:
-
-```assembly
-MAGIC_NUMBER equ 0x1BADB002     ; Identifica kernel Multiboot
-FLAGS        equ 0x0            ; Sem requisitos especiais
-CHECKSUM     equ -MAGIC_NUMBER  ; Validação
+```nasm
+section .multiboot
+align 4
+    dd 0x1BADB002          ; magic number
+    dd 0x00000003          ; flags: page-align + memory info
+    dd -(0x1BADB002 + 3)   ; checksum: magic + flags + checksum = 0
 ```
 
-**Requisito**: `MAGIC_NUMBER + FLAGS + CHECKSUM = 0`
+Ao transferir controle, o GRUB garante:
+- `EAX = 0x2BADB002` (confirma boot Multiboot)
+- `EBX` = endereço **físico** da struct `multiboot_info_t`
+- CPU em modo protegido 32 bits, paginação **desligada**
 
-#### Por que Multiboot?
+## 2. loader.s — Paginação e Salto Higher-Half
 
-- Permite que diferentes bootloaders (GRUB, LILO) carreguem o kernel
-- Padroniza informações passadas ao kernel
-- Simplifica o desenvolvimento
+O kernel é linkado com VMA `0xC0100000` mas carregado fisicamente em `0x00100000`. O `loader.s` precisa ativar paginação antes de qualquer acesso a endereços virtuais altos.
 
-### 4. Ponto de Entrada (loader.s)
+### Page Directory inicial (em `.data`, alinhado em 4096)
 
-Quando o GRUB transfere controle, o código em `loader.s` é executado:
-
-#### 4.1. Configuração da Pilha
-
-```assembly
-mov esp, kernel_stack + KERNEL_STACK_SIZE
+```nasm
+page_directory:
+    dd 0x00000083    ; entrada 0:   identity map 0x0→0x0 (4MB, PSE) — temporário
+    times 767 dd 0   ; entradas 1–767: não mapeadas
+    dd 0x00000083    ; entrada 768: higher-half 0xC0000000→0x0 (4MB, PSE)
+    times 255 dd 0   ; entradas 769–1023: não mapeadas
 ```
 
-- **ESP (Stack Pointer)**: Registrador que aponta para o topo da pilha
-- **Pilha**: Área de memória para chamadas de função e variáveis locais
-- **Tamanho**: 4 KB (4096 bytes)
-- **Crescimento**: De cima para baixo (ESP aponta para o fim)
+`0x83 = Present | R/W | PageSize(4MB)`
 
-#### 4.2. Valor de Debug
+### Sequência de ativação
 
-```assembly
-mov eax, 0xCAFEBABE
+```nasm
+; 1. CR3 = endereço FÍSICO do page_directory
+mov eax, page_directory - 0xC0000000
+mov cr3, eax
+
+; 2. Habilita PSE (páginas 4MB)
+mov eax, cr4
+or  eax, 0x10
+mov cr4, eax
+
+; 3. Liga paginação
+mov eax, cr0
+or  eax, 0x80000000
+mov cr0, eax
+
+; 4. Salto indireto para endereço virtual alto
+lea eax, [.higher_half]
+jmp eax
 ```
 
-- Coloca valor reconhecível em EAX
-- Útil para debug com debuggers
-- Pode ser verificado em dumps de memória
+O salto **indireto** via registrador é obrigatório — um `jmp label` direto geraria offset relativo pequeno e não saltaria para `0xC010xxxx`.
 
-#### 4.3. Loop Infinito
+### Após o salto
 
-```assembly
-.loop:
-    jmp .loop
+```nasm
+.higher_half:
+    ; Remove identity map (entrada 0)
+    mov dword [page_directory], 0
+    ; Flush TLB completo
+    mov eax, cr3
+    mov cr3, eax
+    ; Configura stack
+    mov esp, kernel_stack + 4096
+    ; Empurra argumentos para kmain (cdecl, direita para esquerda)
+    push kernel_physical_end
+    push kernel_physical_start
+    push kernel_virtual_end
+    push kernel_virtual_start
+    push edi                    ; multiboot_addr (físico)
+    call kmain
 ```
 
-- Mantém o kernel em execução
-- Evita que o processador execute código inválido
-- Será substituído por chamada ao código C
+## 3. kmain() — Ordem de Inicialização
 
-## Organização da Memória
+A ordem é obrigatória — cada subsistema depende do anterior:
 
-### Layout de Memória no Boot
-
-```
-0x00000000 - 0x000003FF  : Tabela de Vetores de Interrupção (IVT)
-0x00000400 - 0x000004FF  : BIOS Data Area (BDA)
-0x00000500 - 0x00007BFF  : Área livre
-0x00007C00 - 0x00007DFF  : Bootloader (512 bytes)
-0x00007E00 - 0x0009FFFF  : Área livre
-0x000A0000 - 0x000FFFFF  : Memória de vídeo e BIOS ROM
-0x00100000 - ...         : Kernel (1 MB em diante)
-```
-
-### Por que carregar em 1 MB?
-
-- **Primeiros 640 KB**: Memória convencional (pode ter conflitos)
-- **640 KB - 1 MB**: Área reservada (vídeo, BIOS)
-- **1 MB+**: Memória estendida (segura para o kernel)
-
-## Seções do Kernel
-
-O linker organiza o kernel em seções:
-
-### .text (Código)
-
-- Contém instruções executáveis
-- Somente leitura
-- Primeira seção após o endereço base
-
-### .rodata (Dados Read-Only)
-
-- Constantes e strings literais
-- Somente leitura
-- Protege dados contra modificação acidental
-
-### .data (Dados Inicializados)
-
-- Variáveis globais com valores iniciais
-- Leitura e escrita
-- Valores são copiados do arquivo ELF
-
-### .bss (Dados Não Inicializados)
-
-- Variáveis globais sem valor inicial
-- Automaticamente zeradas
-- Economiza espaço no arquivo (não armazena zeros)
-
-## Formato ELF
-
-**ELF (Executable and Linkable Format)** é o formato do executável do kernel.
-
-### Estrutura do ELF
-
-```
-+------------------+
-| ELF Header       | <- Informações básicas
-+------------------+
-| Program Headers  | <- Como carregar na memória
-+------------------+
-| .text section    | <- Código
-+------------------+
-| .rodata section  | <- Constantes
-+------------------+
-| .data section    | <- Dados inicializados
-+------------------+
-| .bss section     | <- Dados não inicializados
-+------------------+
-| Section Headers  | <- Metadados das seções
-+------------------+
+```c
+fb_clear();                                    // 1. Limpa tela (sem dependências)
+pfa_init(kphys_start, kphys_end, mbinfo);      // 2. Bitmap de frames físicos
+paging_init();                                 // 3. Troca PSE 4MB por page tables 4KB
+gdt_init();                                    // 4. Segmentos de memória
+tss_init(0x10, kernel_virtual_end);            // 5. Task State Segment
+serial_init();                                 // 6. Porta serial (debug)
+idt_init();                                    // 7. Tabela de interrupções
+pic_remap();                                   // 8. Remapeia PIC (IRQ0=32, IRQ1=33)
+pit_init(100);                                 // 9. Timer 100 Hz
+kheap_init();                                  // 10. Heap do kernel
+process_init();                                // 11. Tabela de processos (PID 0 = kernel)
+asm volatile("sti");                           // 12. Habilita interrupções
+shell_run();                                   // 13. Loop principal (nunca retorna)
 ```
 
-### Vantagens do ELF
+### Por que pfa_init antes de paging_init?
 
-- Suportado nativamente pelo GRUB
-- Permite múltiplas seções
-- Facilita debug e análise
-- Padrão em sistemas Unix/Linux
+`paging_init()` pode chamar `pfa_alloc()` internamente para alocar page tables. Se o PFA não estiver inicializado, `pfa_alloc()` retorna 0 e a paginação falha.
+
+### Por que gdt_init antes de tss_init?
+
+`tss_init()` instala o descritor TSS na entrada 5 da GDT. A GDT precisa existir antes.
+
+### Por que sti por último?
+
+Com interrupções habilitadas, o PIT começa a disparar IRQ0 e o teclado pode gerar IRQ1. Todos os handlers precisam estar registrados na IDT antes disso.

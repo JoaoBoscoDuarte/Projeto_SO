@@ -1,127 +1,155 @@
 #include "io.h"
 #include "fb.h"
 
-// ============================================================================
-// FRAMEBUFFER - Driver de vídeo VGA em modo texto
-// ============================================================================
-// Memória VGA: 0xB8000 - 0xB8FA0 (4000 bytes)
-// Tela: 80 colunas x 25 linhas = 2000 caracteres
-// Cada caractere ocupa 2 bytes: [caractere][atributo de cor]
-// ============================================================================
+/* ============================================================================
+ * fb.c — Driver de framebuffer VGA (modo texto 80x25)
+ *
+ * Memória VGA: 0xB8000 (mapeado em alto-endereço em 0xC00B8000 pelo kernel)
+ * Layout de cada célula: [byte0 = char][byte1 = atributo de cor]
+ * atributo: bits 7-4 = fundo, bits 3-0 = texto
+ * ========================================================================== */
 
-// Portas de I/O do controlador VGA para controle do cursor
-#define FB_COMMAND_PORT 0x3D4   // Porta de comando (seleciona registrador)
-#define FB_DATA_PORT    0x3D5   // Porta de dados (lê/escreve valor)
-#define FB_HIGH_BYTE    14      // Registrador: byte alto da posição do cursor
-#define FB_LOW_BYTE     15      // Registrador: byte baixo da posição do cursor
+#define FB_COMMAND_PORT 0x3D4
+#define FB_DATA_PORT    0x3D5
+#define FB_HIGH_BYTE    14
+#define FB_LOW_BYTE     15
 
-// Ponteiro para a memória de vídeo VGA
-static char *fb = (char *) 0xC00B8000;  // Endereço fixo da memória VGA
+static char *fb = (char *)0xC00B8000;
 
-// Posição atual do cursor (0-1999, onde 0 = canto superior esquerdo)
+/* cursor_pos: posição linear 0..(FB_COLS*FB_ROWS - 1) */
 static unsigned short cursor_pos = 0;
 
-// ============================================================================
-// fb_clear - Limpa a tela inteira
-// ============================================================================
-// Preenche toda a tela com espaços em branco com fundo preto
+/* ============================================================================
+ * Funções originais
+ * ========================================================================== */
+
 void fb_clear(void)
 {
     unsigned int i;
-    // Percorre todas as 2000 células da tela (80x25)
-    for (i = 0; i < 80 * 25; i++) {
-        fb[i * 2] = ' ';        // Byte 0: caractere espaço
+    for (i = 0; i < FB_COLS * FB_ROWS; i++) {
+        fb[i * 2]     = ' ';
         fb[i * 2 + 1] = ((FB_BLACK & 0x0F) << 4) | (FB_LIGHT_GREY & 0x0F);
-                                // Byte 1: atributo de cor
-                                // Bits 7-4: cor de fundo (preto)
-                                // Bits 3-0: cor do texto (cinza claro)
     }
-    cursor_pos = 0;             // Reseta cursor para início
-    fb_move_cursor(cursor_pos); // Atualiza cursor no hardware
+    cursor_pos = 0;
+    fb_move_cursor(cursor_pos);
 }
 
-// ============================================================================
-// fb_write_cell - Escreve um caractere em uma posição específica
-// ============================================================================
-// i: posição na tela (0-1999)
-// c: caractere a escrever
-// fg: cor do texto (foreground)
-// bg: cor do fundo (background)
 void fb_write_cell(unsigned int i, char c, unsigned char fg, unsigned char bg)
 {
-    fb[i * 2] = c;              // Escreve o caractere
+    fb[i * 2]     = c;
     fb[i * 2 + 1] = ((bg & 0x0F) << 4) | (fg & 0x0F);
-                                // Combina cores: fundo nos 4 bits altos,
-                                // texto nos 4 bits baixos
 }
 
-// ============================================================================
-// fb_move_cursor - Move o cursor piscante na tela
-// ============================================================================
-// pos: nova posição do cursor (0-1999)
-// Comunica com o controlador VGA via portas I/O
 void fb_move_cursor(unsigned short pos)
 {
-    // Envia byte alto da posição (bits 15-8)
-    outb(FB_COMMAND_PORT, FB_HIGH_BYTE);        // Seleciona registrador 14
-    outb(FB_DATA_PORT, ((pos >> 8) & 0x00FF));  // Envia bits 15-8
-    
-    // Envia byte baixo da posição (bits 7-0)
-    outb(FB_COMMAND_PORT, FB_LOW_BYTE);         // Seleciona registrador 15
-    outb(FB_DATA_PORT, pos & 0x00FF);           // Envia bits 7-0
+    outb(FB_COMMAND_PORT, FB_HIGH_BYTE);
+    outb(FB_DATA_PORT,    (pos >> 8) & 0x00FF);
+    outb(FB_COMMAND_PORT, FB_LOW_BYTE);
+    outb(FB_DATA_PORT,    pos & 0x00FF);
 }
 
-// ============================================================================
-// fb_write - Escreve uma string na tela
-// ============================================================================
-// buf: buffer com os caracteres a escrever
-// len: quantidade de caracteres
-// Retorna: número de caracteres escritos
 int fb_write(char *buf, unsigned int len)
 {
     unsigned int i;
-    
-    // Processa cada caractere do buffer
     for (i = 0; i < len; i++) {
         if (buf[i] == '\n') {
-            // Nova linha: move cursor para início da próxima linha
-            // Divide por 80 para obter linha atual, soma 1, multiplica por 80
-            cursor_pos = (cursor_pos / 80 + 1) * 80;
-            
+            cursor_pos = (unsigned short)((cursor_pos / FB_COLS + 1) * FB_COLS);
         } else if (buf[i] == '\r') {
-            // Carriage return: volta para início da linha atual
-            cursor_pos = (cursor_pos / 80) * 80;
-            
+            cursor_pos = (unsigned short)((cursor_pos / FB_COLS) * FB_COLS);
         } else {
-            // Caractere normal: escreve e avança cursor
             fb_write_cell(cursor_pos, buf[i], FB_LIGHT_GREY, FB_BLACK);
             cursor_pos++;
         }
-        
-        // Se cursor passou do fim da tela, volta para o início
-        // (implementação simples, sem scroll)
-        if (cursor_pos >= 80 * 25) {
-            cursor_pos = 0;
+        if (cursor_pos >= FB_COLS * FB_ROWS) {
+            fb_scroll();
+            cursor_pos = (unsigned short)(FB_COLS * (FB_ROWS - 1));
         }
     }
-    
-    // Atualiza posição do cursor no hardware
     fb_move_cursor(cursor_pos);
     return (int)len;
 }
 
-// ============================================================================
-// fb_scroll - Rola a tela uma linha para cima
-// ============================================================================
-void fb_scroll(void) {
+void fb_scroll(void)
+{
     unsigned int i;
-    // Move todas as linhas uma posição acima
-    for (i = 0; i < 80 * 24 * 2; i++) {
-        fb[i] = fb[i + 80 * 2];
+    for (i = 0; i < FB_COLS * (FB_ROWS - 1) * 2; i++)
+        fb[i] = fb[i + FB_COLS * 2];
+    for (i = FB_COLS * (FB_ROWS - 1) * 2; i < FB_COLS * FB_ROWS * 2; i += 2) {
+        fb[i]     = ' ';
+        fb[i + 1] = 0x07;
     }
-    // Limpa a última linha
-    for (i = 80 * 24 * 2; i < 80 * 25 * 2; i += 2) {
-        fb[i] = ' ';
-        fb[i+1] = 0x07;
+}
+
+/* ============================================================================
+ * Funções posicionais novas
+ * ========================================================================== */
+
+void fb_write_at(unsigned int row, unsigned int col,
+                 char c, unsigned char fg, unsigned char bg)
+{
+    if (row >= FB_ROWS || col >= FB_COLS)
+        return;
+    unsigned int pos = row * FB_COLS + col;
+    fb[pos * 2]     = c;
+    fb[pos * 2 + 1] = ((bg & 0x0F) << 4) | (fg & 0x0F);
+}
+
+void fb_write_str_at(unsigned int row, unsigned int col,
+                     const char *str, unsigned char fg, unsigned char bg)
+{
+    unsigned int c = col;
+    if (row >= FB_ROWS)
+        return;
+    while (*str && c < FB_COLS) {
+        fb_write_at(row, c, *str, fg, bg);
+        str++;
+        c++;
     }
+}
+
+void fb_clear_line(unsigned int row)
+{
+    unsigned int col;
+    if (row >= FB_ROWS)
+        return;
+    for (col = 0; col < FB_COLS; col++)
+        fb_write_at(row, col, ' ', FB_LIGHT_GREY, FB_BLACK);
+}
+
+void fb_putchar(char c)
+{
+    if (c == '\n') {
+        cursor_pos = (unsigned short)((cursor_pos / FB_COLS + 1) * FB_COLS);
+    } else if (c == '\b') {
+        if (cursor_pos > 0) {
+            cursor_pos--;
+            fb_write_cell(cursor_pos, ' ', FB_LIGHT_GREY, FB_BLACK);
+        }
+    } else {
+        fb_write_cell(cursor_pos, c, FB_LIGHT_GREY, FB_BLACK);
+        cursor_pos++;
+    }
+    if (cursor_pos >= FB_COLS * FB_ROWS) {
+        fb_scroll();
+        cursor_pos = (unsigned short)(FB_COLS * (FB_ROWS - 1));
+    }
+    fb_move_cursor(cursor_pos);
+}
+
+void fb_set_cursor(unsigned int row, unsigned int col)
+{
+    if (row >= FB_ROWS) row = FB_ROWS - 1;
+    if (col >= FB_COLS) col = FB_COLS - 1;
+    cursor_pos = (unsigned short)(row * FB_COLS + col);
+    fb_move_cursor(cursor_pos);
+}
+
+unsigned int fb_get_cursor_row(void)
+{
+    return cursor_pos / FB_COLS;
+}
+
+unsigned int fb_get_cursor_col(void)
+{
+    return cursor_pos % FB_COLS;
 }

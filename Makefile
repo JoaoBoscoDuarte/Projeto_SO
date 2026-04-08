@@ -2,6 +2,7 @@
 SRC_DIR = src
 BUILD_DIR = build
 ISO_DIR = iso
+LOG_DIR = logs
 
 # Compiladores e Ferramentas
 CC = gcc
@@ -35,12 +36,24 @@ OBJECTS = $(BUILD_DIR)/loader.o \
           $(BUILD_DIR)/printf.o \
           $(BUILD_DIR)/gdt.o \
           $(BUILD_DIR)/gdt_s.o \
+          $(BUILD_DIR)/tss.o \
+          $(BUILD_DIR)/tss_s.o \
           $(BUILD_DIR)/pic.o \
           $(BUILD_DIR)/idt.o \
           $(BUILD_DIR)/interrupts.o \
           $(BUILD_DIR)/keyboard.o \
           $(BUILD_DIR)/pfa.o \
-          $(BUILD_DIR)/paging.o
+          $(BUILD_DIR)/paging.o \
+		  $(BUILD_DIR)/kheap.o \
+          $(BUILD_DIR)/process.o \
+          $(BUILD_DIR)/usermode.o \
+          $(BUILD_DIR)/scheduler.o \
+          $(BUILD_DIR)/switch_s.o \
+          $(BUILD_DIR)/string.o \
+          $(BUILD_DIR)/cpuid.o \
+          $(BUILD_DIR)/pit.o \
+          $(BUILD_DIR)/shell.o \
+          $(BUILD_DIR)/top.o
 
 all: kernel.elf
 
@@ -64,6 +77,7 @@ os.iso: kernel.elf $(MODULE_PROGRAM)
 
 
 run: os.iso
+	@mkdir -p $(LOG_DIR)
 	bochs -f bochsrc.txt -q
 
 # =============================================================================
@@ -101,7 +115,7 @@ docker-run: docker-build
 		           -serial stdio \
 		           -no-reboot \
 		           -d int,cpu_reset \
-		           2>&1 | tee qemu.log"
+		           2>&1 | tee logs/qemu.log"
 
 docker-shell: docker-build
 	docker run --rm -it \
@@ -155,13 +169,51 @@ $(BUILD_DIR)/keyboard.o: $(SRC_DIR)/drivers/keyboard.c
 $(MODULE_PROGRAM): program.s | $(BUILD_DIR)
 	$(AS) -f bin $< -o $@
 
+$(BUILD_DIR)/tss.o: $(SRC_DIR)/drivers/tss.c
+	$(CC) $(CFLAGS) $< -o $@
+
+$(BUILD_DIR)/tss_s.o: $(SRC_DIR)/drivers/tss.s
+	$(AS) $(ASFLAGS) $< -o $@
+
 $(BUILD_DIR)/pfa.o: $(SRC_DIR)/drivers/pfa.c
 	$(CC) $(CFLAGS) $< -o $@
 
 $(BUILD_DIR)/paging.o: $(SRC_DIR)/drivers/paging.c
 	$(CC) $(CFLAGS) $< -o $@
 
+$(BUILD_DIR)/kheap.o: $(SRC_DIR)/kernel/kheap.c
+	$(CC) $(CFLAGS) $< -o $@
+
+$(BUILD_DIR)/process.o: $(SRC_DIR)/kernel/process.c
+	$(CC) $(CFLAGS) $< -o $@
+
+$(BUILD_DIR)/usermode.o: $(SRC_DIR)/boot/usermode.s
+	$(AS) $(ASFLAGS) $< -o $@
+
+$(BUILD_DIR)/scheduler.o: $(SRC_DIR)/kernel/scheduler.c
+	$(CC) $(CFLAGS) $< -o $@
+
+$(BUILD_DIR)/switch_s.o: $(SRC_DIR)/kernel/switch.s
+	$(AS) $(ASFLAGS) $< -o $@
+
+$(BUILD_DIR)/string.o: $(SRC_DIR)/lib/string.c
+	$(CC) $(CFLAGS) $< -o $@
+
+$(BUILD_DIR)/cpuid.o: $(SRC_DIR)/lib/cpuid.c
+	$(CC) $(CFLAGS) $< -o $@
+
+$(BUILD_DIR)/pit.o: $(SRC_DIR)/drivers/pit.c
+	$(CC) $(CFLAGS) $< -o $@
+
+$(BUILD_DIR)/shell.o: $(SRC_DIR)/kernel/shell.c
+	$(CC) $(CFLAGS) $< -o $@
+
+$(BUILD_DIR)/top.o: $(SRC_DIR)/kernel/top.c
+	$(CC) $(CFLAGS) $< -o $@
+
 clean:
 	rm -rf $(BUILD_DIR) kernel.elf os.iso
+	rm -f $(LOG_DIR)/bochslog.txt $(LOG_DIR)/com1.out \
+	      $(LOG_DIR)/qemu.log $(LOG_DIR)/serial.log
 
 .PHONY: all run clean docker-build docker-iso docker-run docker-shell

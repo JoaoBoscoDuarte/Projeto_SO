@@ -1,50 +1,53 @@
 #include "gdt.h"
 
-// Criamos uma lista com 3 "crachás" de acesso à memória.
-struct gdt_entry gdt[3];
+/*
+ * GDT com 6 entradas:
+ *   0 (0x00): null descriptor       — obrigatório pelo x86
+ *   1 (0x08): kernel code segment   — DPL=0, Execute-Read
+ *   2 (0x10): kernel data segment   — DPL=0, Read-Write
+ *   3 (0x18): user code segment     — DPL=3, Execute-Read  (Capítulo 11)
+ *   4 (0x20): user data segment     — DPL=3, Read-Write    (Capítulo 11)
+ *   5 (0x28): TSS descriptor        — preenchido por tss_init()
+ */
+struct gdt_entry gdt[6];
 
-// Este é o cartão de visita que entregaremos ao processador 
-// dizendo onde nossa lista (GDT) está guardada.
 struct gdt_ptr gp;
 
-// Essa função monta cada "crachá" (entrada) da tabela.
-void gdt_set_gate(int num, unsigned int base, unsigned int limit, 
-                  unsigned char access, unsigned char gran) 
+void gdt_set_gate(int num, unsigned int base, unsigned int limit,
+                  unsigned char access, unsigned char gran)
 {
-    // O endereço de início (base) precisa ser fatiado em 3 pedaços 
-    // porque o processador é antigo e lê os bits em lugares espalhados.
-    gdt[num].base_low    = (base & 0xFFFF);         // Pedaço 1
-    gdt[num].base_middle = (base >> 16) & 0xFF;     // Pedaço 2
-    gdt[num].base_high   = (base >> 24) & 0xFF;     // Pedaço 3
+    gdt[num].base_low    = (base & 0xFFFF);
+    gdt[num].base_middle = (base >> 16) & 0xFF;
+    gdt[num].base_high   = (base >> 24) & 0xFF;
 
-    // O tamanho do segmento (limit) também é fatiado em 2.
     gdt[num].limit_low   = (limit & 0xFFFF);
-    // Ajuste aqui:
     gdt[num].granularity = (limit >> 16) & 0x0F;
     gdt[num].granularity |= (gran & 0xF0);
     gdt[num].access      = access;
 }
 
-void gdt_init() {
-    // 1. Preparamos o ponteiro que o processador vai ler depois.
-    gp.limit = (sizeof(struct gdt_entry) * 3) - 1; // Tamanho da tabela
-    gp.base  = (unsigned int)&gdt;                 // Onde ela está na RAM
+void gdt_init(void)
+{
+    gp.limit = (sizeof(struct gdt_entry) * 6) - 1;
+    gp.base  = (unsigned int)&gdt;
 
-    // 2. CRIAÇÃO DOS SEGMENTOS (Os cartões de acesso):
-
-    // Entrada 0: O "Crachá Vazio". O processador exige que o primeiro 
-    // seja nulo por segurança. Se alguém usar, o PC reinicia.
+    /* Entrada 0: null — obrigatório */
     gdt_set_gate(0, 0, 0, 0, 0);
 
-    // Entrada 1: Código do Kernel.
-    // Dá permissão para o processador EXECUTAR ordens.
-    // Base 0, Limite 4GB, Acesso 0x9A (Código), Granularidade 0xCF (4KB/32bits)
+    /* Entrada 1: kernel code — Present | DPL=0 | Code | Execute-Read */
     gdt_set_gate(1, 0, 0xFFFFFFFF, 0x9A, 0xCF);
 
-    // Entrada 2: Dados do Kernel.
-    // Dá permissão para o processador GUARDAR valores na memória (leitura/escrita).
+    /* Entrada 2: kernel data — Present | DPL=0 | Data | Read-Write */
     gdt_set_gate(2, 0, 0xFFFFFFFF, 0x92, 0xCF);
 
-    // envia para o processador 
+    /* Entrada 3: user code — Present | DPL=3 | Code | Execute-Read (0xFA) */
+    gdt_set_gate(3, 0, 0xFFFFFFFF, 0xFA, 0xCF);
+
+    /* Entrada 4: user data — Present | DPL=3 | Data | Read-Write (0xF2) */
+    gdt_set_gate(4, 0, 0xFFFFFFFF, 0xF2, 0xCF);
+
+    /* Entrada 5: TSS descriptor — preenchida por tss_init() após gdt_init() */
+    gdt_set_gate(5, 0, 0, 0, 0);
+
     gdt_flush((unsigned int)&gp);
 }

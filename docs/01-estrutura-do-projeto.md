@@ -1,143 +1,84 @@
-# Estrutura do Projeto
-
-## Visão Geral
-
-Este documento descreve a organização e estrutura do projeto do Sistema Operacional, explicando a função de cada arquivo e diretório.
+# 01 — Estrutura do Projeto
 
 ## Árvore de Diretórios
 
 ```
 projeto_so/
-├── docs/                    # Documentação do projeto
-├── iso/                     # Estrutura para criação da imagem ISO bootável
-│   └── boot/
-│       ├── grub/           # Configuração do bootloader GRUB
-│       │   ├── grub.cfg    # Script de configuração do GRUB2
-│       │   ├── menu.lst    # Menu de boot do GRUB
-│       │   └── stage2_eltorito  # Stage 2 do GRUB para boot em CD/ISO
-│       └── kernel.elf      # Kernel compilado (copiado durante build)
-├── loader.s                # Código assembly do bootloader
 ├── src/
+│   ├── boot/
+│   │   ├── loader.s          # Ponto de entrada: Multiboot, paginação, salto para kmain
+│   │   └── usermode.s        # Transição ring 0 → ring 3 via iret
 │   ├── drivers/
-│   │   ├── fb.c             # Driver de Framebuffer (Vídeo)
-│   │   ├── keyboard.c       # Driver de Teclado (Scancodes e ASCII)
-│   │   ├── idt.c            # Tabela de Descritores de Interrupção
-│   │   ├── pic.c            # Controlador de Interrupções Programável
-│   │   └── gdt.c            # Global Descriptor Table
-├── kmain.c                 # Código C principal do kernel
-├── link.ld                 # Script de linker
-├── Makefile               # Automação de build
-├── bochsrc.txt            # Configuração do emulador Bochs
-└── README.md              # Documentação principal
+│   │   ├── fb.c              # Framebuffer VGA modo texto 80x25
+│   │   ├── gdt.c / gdt.s     # Global Descriptor Table
+│   │   ├── tss.c / tss.s     # Task State Segment
+│   │   ├── idt.c             # Interrupt Descriptor Table
+│   │   ├── interrupts.s      # Handlers IRQ0 (timer) e IRQ1 (teclado)
+│   │   ├── pic.c             # Programmable Interrupt Controller 8259A
+│   │   ├── pit.c             # Programmable Interval Timer — 100 Hz
+│   │   ├── keyboard.c        # Driver PS/2 com buffer circular
+│   │   ├── paging.c          # Subsistema de paginação 4KB
+│   │   ├── pfa.c             # Page Frame Allocator (bitmap)
+│   │   ├── serial.c          # Porta serial COM1 (debug)
+│   │   └── io.s              # outb / inb em assembly
+│   ├── kernel/
+│   │   ├── kmain.c           # Ponto de entrada C — inicializa subsistemas
+│   │   ├── kheap.c           # Heap do kernel (free-list)
+│   │   ├── process.c         # PCB, tabela de processos, criação
+│   │   ├── scheduler.c       # Scheduler cooperativo round-robin
+│   │   ├── switch.s          # context_switch em assembly
+│   │   ├── shell.c           # Mini-shell interativo
+│   │   └── top.c             # Monitor de processos em tempo real
+│   ├── lib/
+│   │   ├── printf.c          # kprintf com suporte a %d, %x, %s
+│   │   ├── string.c          # strcmp, strlen, memset, memcpy, atoi
+│   │   └── cpuid.c           # Leitura de vendor/brand do CPU via CPUID
+│   └── include/              # Headers públicos de todos os módulos
+├── docs/                     # Esta documentação
+├── iso/                      # Estrutura da imagem ISO bootável
+├── link.ld                   # Linker script — higher-half kernel
+├── Makefile                  # Build, ISO, Docker, execução
+└── bochsrc.txt               # Configuração do emulador Bochs
 ```
-
-## Descrição dos Arquivos
-
-### Arquivos de Código Fonte
-
-### `keyboard.c`
-- **Linguagem**: C
-- **Função**: Driver de entrada do teclado
-- **Responsabilidades**:
-  - Comunicar-se com o controlador i8042 via porta I/O 0x60
-  - Traduzir scancodes brutos de hardware para caracteres ASCII
-  - Processar teclas de controle como Enter e Backspace
-
-### `idt.c`
-- **Linguagem**: C
-- **Função**: Gerenciador de interrupt descriptor table
-- **Responsabilidades**:
-  - Definir os portões (gates) de interrupção do processador
-  - Mapear sinais de hardware para funções específicas em C (handlers)
-  - Prevenir Triple Faults ao garantir que interrupções inesperadas sejam tratadas
-
-### `pic.c`
-- **Linguagem**: C
-- **Função**: Driver do Programmable Interrupt Controller (8259A)
-- **Responsabilidades**:
-  - Remapear os vetores de interrupção para evitar conflitos com exceções da CPU
-  - Mascarar ou desmascarar IRQs específicas (como ativar o teclado e silenciar o timer)
-  - Gerenciar o envio de sinais de confirmação (EOI - End of Interrupt)
-
-### `gdt.c`
-- **Linguagem**: C
-- **Função**: Gerenciador da Global Descriptor Table
-- **Responsabilidades**:
-  - Definir os segmentos de memória (Código e Dados) e seus privilégios (Ring 0)
-  - Configurar o limite e a base da memória endereçável no modo protegido
-  - Garantir a estabilidade da CPU antes da ativação das interrupções
-
-#### `loader.s`
-
-- **Linguagem**: Assembly x86 (NASM)
-- **Função**: Ponto de entrada do sistema operacional
-- **Responsabilidades**:
-  - Implementar o cabeçalho Multiboot
-  - Configurar a pilha do kernel
-  - Transferir controle para o código C
-
-#### `kmain.c`
-
-- **Linguagem**: C
-- **Função**: Código principal do kernel
-- **Responsabilidades**:
-  - Implementar a lógica principal do SO
-  - Gerenciar recursos do sistema
-  - Atualmente vazio (será expandido)
-
-### Arquivos de Configuração
-
-#### `link.ld`
-
-- **Tipo**: Linker Script
-- **Função**: Define como o kernel é organizado na memória
-- **Especifica**:
-  - Endereço de carregamento (1 MB)
-  - Ordem das seções (.text, .rodata, .data, .bss)
-  - Alinhamento de memória
-
-#### `Makefile`
-
-- **Tipo**: Script de build
-- **Função**: Automatiza compilação e execução
-- **Comandos principais**:
-  - `make all`: Compila o kernel
-  - `make os.iso`: Cria imagem ISO bootável
-  - `make run`: Compila e executa no Bochs
-  - `make clean`: Remove arquivos gerados
-
-#### `bochsrc.txt`
-
-- **Tipo**: Configuração do emulador
-- **Função**: Define parâmetros do Bochs
-- **Configura**:
-  - Memória RAM
-  - Dispositivos de boot
-  - Periféricos emulados
-
-### Diretório ISO
-
-O diretório `iso/` contém a estrutura necessária para criar uma imagem ISO bootável:
-
-- **boot/grub/menu.lst**: Configuração do menu do GRUB
-- **boot/grub/stage2_eltorito**: Bootloader GRUB para CD-ROM
-- **boot/kernel.elf**: Kernel compilado (copiado durante o build)
-- **boot/grub/grub.cfg**: Instrui o bootloader sobre como carregar o kernel
-
-## Arquivos Gerados
-
-Durante o processo de compilação, os seguintes arquivos são gerados:
-
-- **`*.o`**: Arquivos objeto intermediários
-- **`kernel.elf`**: Executável do kernel no formato ELF
-- **`os.iso`**: Imagem ISO bootável final
-
-Estes arquivos podem ser removidos com `make clean`.
 
 ## Fluxo de Build
 
-1. **Montagem**: `loader.s` → `loader.o` (NASM)
-2. **Compilação**: `kmain.c` → `kmain.o` (GCC)
-3. **Linkagem**: `loader.o` + `kmain.o` → `kernel.elf` (LD)
-4. **Empacotamento**: `kernel.elf` + estrutura ISO → `os.iso` (genisoimage)
-5. **Execução**: `os.iso` → Bochs
+```
+loader.s  ──nasm──►  loader.o  ─┐
+kmain.c   ──gcc───►  kmain.o   ─┤
+drivers/  ──gcc───►  *.o       ─┼──ld──► kernel.elf ──► os.iso ──► bochs
+kernel/   ──gcc───►  *.o       ─┤
+lib/      ──gcc───►  *.o       ─┘
+```
+
+### Comandos principais
+
+| Comando | Ação |
+|---------|------|
+| `make` | Compila o kernel |
+| `make os.iso` | Gera a imagem ISO |
+| `make run` | Compila e executa no Bochs |
+| `make clean` | Remove artefatos de build |
+| `make docker-run` | Compila e executa via Docker + QEMU (macOS/ARM) |
+
+## Flags de Compilação
+
+```makefile
+-m32                  # Alvo 32 bits
+-nostdlib -nostdinc   # Sem biblioteca padrão
+-fno-builtin          # Sem funções built-in do GCC
+-fno-stack-protector  # Sem stack canary (requer SO)
+-fno-pie -fno-pic     # Sem position-independent code
+-Wall -Wextra -Werror # Todos os warnings são erros
+```
+
+## Layout de Memória Virtual
+
+```
+0x00000000 – 0xBFFFFFFF  espaço de usuário (futuro)
+0xC0000000 – 0xC03FFFFF  kernel (4 MB, entrada 768 do PD)
+0xC0400000 – 0xC07FFFFF  mapeamentos temporários (entrada 769)
+0xC1000000 – ...         heap do kernel (cresce sob demanda)
+0xC2000000 – ...         kernel stacks dos processos
+                         PID n → 0xC2000000 + n * 0x2000
+```

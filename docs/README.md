@@ -1,32 +1,15 @@
-# Documentação do Projeto SO
+# Documentação Técnica — Projeto SO
 
-## Índice de Documentos
+Documentação de referência da implementação. Para instruções de instalação e execução rápida, veja o [README principal](../README.md).
 
-### 1. [Estrutura do Projeto](01-estrutura-do-projeto.md)
+## Índice
 
-**Recomendado para**: Iniciantes
-
-### 2. [Processo de Boot](02-processo-de-boot.md)
-
-**Recomendado para**: Após entender a estrutura
-
-### 3. [Conceitos Fundamentais](03-conceitos-fundamentais.md)
-
-**Recomendado para**: Aprofundamento teórico
-
-### 4. [Análise Detalhada do Código](04-analise-do-codigo.md)
-
-**Recomendado para**: Entendimento linha por linha
-
-### 5. [Criando a VM](05-criando-vm.md)
-
-**Recomendado para**: Configuração do ambiente de emulação
-
-### 6. [Paging e Page Frame Allocator](06-paging-e-pfa.md)
-
-**Recomendado para**: Entender o sistema de memória virtual e alocação de frames
-
----
-
-**Última atualização**: Adicionado documento sobre Paging e PFA
-**Versão**: 1.1
+| # | Documento | Conteúdo |
+|---|-----------|----------|
+| 01 | [Estrutura do Projeto](01-estrutura-do-projeto.md) | Árvore de arquivos, flags de compilação, layout de memória virtual |
+| 02 | [Processo de Boot](02-processo-de-boot.md) | BIOS → GRUB → loader.s (higher-half) → kmain, ordem de inicialização |
+| 03 | [Drivers e Subsistemas](04-drivers-e-subsistemas.md) | Framebuffer, teclado, PIT, serial, GDT, IDT, PIC, kprintf |
+| 04 | [Memória](05-memoria.md) | Paginação two-level, temp_map, PFA (bitmap), heap (free-list) |
+| 05 | [Processos e Scheduler](06-processos-e-scheduler.md) | PCB, estados, context switch assembly, scheduler cooperativo |
+| 06 | [Mini-Shell e Top](07-mini-shell-e-top.md) | Comandos do shell, monitor top, fluxo completo de execução |
+| 07 | [Como Rodar](08-como-rodar.md) | Guia detalhado para Linux e macOS (Docker + QEMU) |

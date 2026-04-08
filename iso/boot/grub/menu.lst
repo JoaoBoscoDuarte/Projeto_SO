@@ -1,6 +1,34 @@
-    default=0
-    timeout=0
+# =============================================================================
+# menu.lst — Configuração do GRUB Legacy (GRUB 0.97) para boot do kernel
+#
+# Usado pelo stage2_eltorito presente nesta ISO.
+# O stage2_eltorito é o segundo estágio do GRUB Legacy, gravado diretamente
+# na imagem ISO pelo genisoimage/grub-mkrescue. Ele lê este arquivo para
+# saber qual kernel carregar.
+#
+# DIFERENÇA ENTRE menu.lst E grub.cfg:
+#   menu.lst  → GRUB Legacy (0.97) — sintaxe antiga, usado pelo stage2_eltorito
+#   grub.cfg  → GRUB 2            — sintaxe moderna, usado pelo grub-mkrescue
+#
+# Localização na ISO: /boot/grub/menu.lst
+# =============================================================================
 
-    title os
+# Índice da entrada padrão (base 0).
+# 0 = primeira entrada definida abaixo.
+default=0
+
+# Tempo de espera em segundos antes de iniciar a entrada padrão.
+# 0 = boot imediato.
+timeout=0
+
+# Entrada de boot do kernel
+title os
+
+    # Carrega o kernel ELF no formato Multiboot.
+    # O GRUB verifica o magic number (0x1BADB002) nos primeiros 8 KB,
+    # preenche a struct multiboot_info e passa seu endereço em EBX.
     kernel /boot/kernel.elf
+
+    # Carrega o módulo Multiboot (binário plano).
+    # Endereço de carga disponível via multiboot_info_t.mods_addr no kernel.
     module /modules/program
