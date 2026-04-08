@@ -96,33 +96,56 @@ A pasta `docs/` contém a documentação técnica completa:
 - [OSDev Wiki](https://wiki.osdev.org/)
 - [Intel® 64 and IA-32 Architectures Software Developer Manuals](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html)
 
-## Contribuidores
-
+Contribuidores
 <table>
-  <tr>
-    <td align="center">
-      <a href="https://github.com/JoaoBoscoDuarte">
-        <img src="https://github.com/JoaoBoscoDuarte.png" width="100"/><br>
-        <b>João Bosco Duarte</b>
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://github.com/guilopeszw">
-        <img src="https://github.com/guilopeszw.png" width="100"/><br>
-        <b>Guilherme Lopes</b>
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://github.com/Marcus-Vin">
-        <img src="https://github.com/Marcus-Vin.png" width="100"/><br>
-        <b>Marcus Vinícius</b>
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://github.com/SamSantosidc">
-        <img src="https://github.com/SamSantosidc.png" width="100"/><br>
-        <b>Samuel Santos</b>
-      </a>
-    </td>
-  </tr>
+<tr>
+<td align="center" valign="top" width="25%">
+<a href="https://github.com/JoaoBoscoDuarte">
+<img src="https://github.com/JoaoBoscoDuarte.png" width="100"/>
+
+
+<b>João Bosco Duarte</b>
+</a>
+
+
+
+GDT, PFA, shell, comandos (help, clear, ps, top, info, spawn, kill, reboot, poweroff)
+</td>
+<td align="center" valign="top" width="25%">
+<a href="https://github.com/guilopeszw">
+<img src="https://github.com/guilopeszw.png" width="100"/>
+
+
+<b>Guilherme Lopes</b>
+</a>
+
+
+
+Recebimento do teclado, paginação, higher half linker, troca de contexto por timer
+</td>
+<td align="center" valign="top" width="25%">
+<a href="https://github.com/Marcus-Vin">
+<img src="https://github.com/Marcus-Vin.png" width="100"/>
+
+
+<b>Marcus Vinícius</b>
+</a>
+
+
+
+User mode, GitHub CI, PCB, funções
+</td>
+<td align="center" valign="top" width="25%">
+<a href="https://github.com/SamSantosidc">
+<img src="https://github.com/SamSantosidc.png" width="100"/>
+
+
+<b>Samuel Santos</b>
+</a>
+
+
+
+PFA dinâmico, IDT, Spawn de processos cooperativos, histórico de comandos, Kernel Heap
+</td>
+</tr>
 </table>
