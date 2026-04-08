@@ -2,6 +2,7 @@
 SRC_DIR = src
 BUILD_DIR = build
 ISO_DIR = iso
+LOG_DIR = logs
 
 # Compiladores e Ferramentas
 CC = gcc
@@ -76,6 +77,7 @@ os.iso: kernel.elf $(MODULE_PROGRAM)
 
 
 run: os.iso
+	@mkdir -p $(LOG_DIR)
 	bochs -f bochsrc.txt -q
 
 # =============================================================================
@@ -113,7 +115,7 @@ docker-run: docker-build
 		           -serial stdio \
 		           -no-reboot \
 		           -d int,cpu_reset \
-		           2>&1 | tee qemu.log"
+		           2>&1 | tee logs/qemu.log"
 
 docker-shell: docker-build
 	docker run --rm -it \
@@ -211,5 +213,7 @@ $(BUILD_DIR)/top.o: $(SRC_DIR)/kernel/top.c
 
 clean:
 	rm -rf $(BUILD_DIR) kernel.elf os.iso
+	rm -f $(LOG_DIR)/bochslog.txt $(LOG_DIR)/com1.out \
+	      $(LOG_DIR)/qemu.log $(LOG_DIR)/serial.log
 
 .PHONY: all run clean docker-build docker-iso docker-run docker-shell

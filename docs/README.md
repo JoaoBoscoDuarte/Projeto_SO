@@ -1,19 +1,15 @@
-# Documentação — Projeto SO
+# Documentação Técnica — Projeto SO
 
-Documentação completa do sistema operacional desenvolvido na disciplina de Sistemas Operacionais da UFPB.
+Documentação de referência da implementação. Para instruções de instalação e execução rápida, veja o [README principal](../README.md).
 
 ## Índice
 
 | # | Documento | Conteúdo |
 |---|-----------|----------|
-| 1 | [Estrutura do Projeto](01-estrutura-do-projeto.md) | Organização de arquivos, fluxo de build |
-| 2 | [Processo de Boot](02-processo-de-boot.md) | BIOS → GRUB → loader.s → kmain |
-| 3 | [Conceitos Fundamentais](03-conceitos-fundamentais.md) | x86, memória, interrupções, paginação |
-| 4 | [Drivers e Subsistemas](04-drivers-e-subsistemas.md) | FB, teclado, serial, GDT, IDT, PIC, PIT |
-| 5 | [Memória](05-memoria.md) | Paginação higher-half, PFA, heap do kernel |
-| 6 | [Processos e Scheduler](06-processos-e-scheduler.md) | PCB, context switch, scheduler cooperativo |
-| 7 | [Mini-Shell e Top](07-mini-shell-e-top.md) | Shell, comandos, monitor de processos |
-
----
-
-**Versão atual:** higher-half kernel + paginação 4KB + PFA + heap + processos cooperativos + mini-shell + top
+| 01 | [Estrutura do Projeto](01-estrutura-do-projeto.md) | Árvore de arquivos, flags de compilação, layout de memória virtual |
+| 02 | [Processo de Boot](02-processo-de-boot.md) | BIOS → GRUB → loader.s (higher-half) → kmain, ordem de inicialização |
+| 03 | [Drivers e Subsistemas](04-drivers-e-subsistemas.md) | Framebuffer, teclado, PIT, serial, GDT, IDT, PIC, kprintf |
+| 04 | [Memória](05-memoria.md) | Paginação two-level, temp_map, PFA (bitmap), heap (free-list) |
+| 05 | [Processos e Scheduler](06-processos-e-scheduler.md) | PCB, estados, context switch assembly, scheduler cooperativo |
+| 06 | [Mini-Shell e Top](07-mini-shell-e-top.md) | Comandos do shell, monitor top, fluxo completo de execução |
+| 07 | [Como Rodar](08-como-rodar.md) | Guia detalhado para Linux e macOS (Docker + QEMU) |

@@ -1,65 +1,85 @@
 # Projeto SO
 
-Projeto da disciplina de Sistemas Operacionais do curso de Ciência da Computação da UFPB com o objetivo de desenvolver um Sistema Operacional do zero.
+Projeto da disciplina de Sistemas Operacionais — Ciência da Computação, UFPB.
 
-## Sumário
+Implementação de um sistema operacional x86 32-bit do zero, com base no livro *The Little Book About OS Development* de Erik Helin e Adam Renberg.
 
-1. [Sobre o Projeto](#sobre-o-projeto)
-2. [Dependências](#dependências)
-3. [Compilação e Execução](#compilação-e-execução)
-4. [Documentação](#documentação)
-5. [Referências](#referências)
-6. [Contribuidores](#contribuidores)
+## O que está implementado
 
-## Sobre o Projeto
-
-Este projeto utiliza como principal referência o livro "The Little Book About OS Development" de Erik Helin e Adam Renberg, implementando conceitos fundamentais de sistemas operacionais.
+- Boot Multiboot via GRUB com kernel higher-half (`0xC0100000`)
+- Paginação x86 two-level (4KB pages)
+- Page Frame Allocator (bitmap)
+- Heap do kernel (free-list com split e coalescing)
+- GDT, IDT, PIC, PIT (100 Hz), TSS
+- Driver de framebuffer VGA modo texto 80×25
+- Driver de teclado PS/2 com buffer circular
+- Gerenciamento de processos (PCB, tabela, context switch cooperativo)
+- Scheduler round-robin cooperativo
+- Mini-shell interativo com comandos: `help`, `clear`, `ps`, `top`, `info`, `spawn`, `kill`, `reboot`, `poweroff`
+- Monitor de processos em tempo real (`top`) com CPU%, RAM, heap e info do CPU
 
 ## Dependências
 
-### Instalação
-
-Para instalar todas as dependências necessárias no Ubuntu/Debian:
+### Ubuntu / Debian
 
 ```bash
-sudo apt install nasm binutils gcc make grub-legacy genisoimage bochs bochs-x xorriso
+./install_deps.sh
 ```
 
-#### Ferramentas de Compilação
+Ou manualmente:
 
-- `nasm` - Assembler para código x86
-- `ld` (binutils) - Linker
-- `gcc` - Compilador C
-- `make` - Automação de build
+```bash
+sudo apt update
+sudo apt install -y gcc gcc-multilib nasm binutils make \
+    grub-pc-bin grub-common xorriso mtools bochs bochs-x
+```
 
-#### Ferramentas de Boot e Emulação
+### macOS (Apple Silicon)
 
-- `grub-legacy` (stage2_eltorito) - Bootloader
-- `genisoimage` - Criação de imagem ISO
-- `bochs` - Emulador x86
+Requer Docker Desktop. Veja [docs/08-como-rodar.md](docs/08-como-rodar.md).
 
 ## Compilação e Execução
 
-Certifique-se de estar na pasta principal do projeto e execute:
-
 ```bash
+# Compilar e rodar no Bochs
 make run
+
+# Apenas compilar
+make
+
+# Gerar ISO
+make os.iso
+
+# Limpar artefatos
+make clean
 ```
 
-Este comando irá compilar o sistema operacional e executá-lo automaticamente no emulador Bochs.
+### Via Docker (macOS / qualquer plataforma)
+
+```bash
+make docker-build   # constrói a imagem (uma vez)
+make docker-run     # compila + executa com QEMU headless
+make docker-shell   # shell interativo no container
+```
 
 ## Documentação
 
-Além do código fonte, a pasta `docs/` contém documentos em Markdown com:
+A pasta `docs/` contém a documentação técnica completa:
 
-- Explicações detalhadas sobre a implementação
-- Conceitos fundamentais de sistemas operacionais
-- Guias de desenvolvimento
+| # | Documento | Conteúdo |
+|---|-----------|----------|
+| 01 | [Estrutura do Projeto](docs/01-estrutura-do-projeto.md) | Organização de arquivos, build, layout de memória |
+| 02 | [Processo de Boot](docs/02-processo-de-boot.md) | BIOS → GRUB → loader.s → kmain |
+| 03 | [Drivers e Subsistemas](docs/04-drivers-e-subsistemas.md) | FB, teclado, PIT, serial, GDT, IDT, PIC |
+| 04 | [Memória](docs/05-memoria.md) | Paginação, PFA, heap do kernel |
+| 05 | [Processos e Scheduler](docs/06-processos-e-scheduler.md) | PCB, context switch, scheduler cooperativo |
+| 06 | [Mini-Shell e Top](docs/07-mini-shell-e-top.md) | Comandos, monitor de processos, fluxo completo |
+| 07 | [Como Rodar](docs/08-como-rodar.md) | Guia detalhado Linux e macOS |
 
 ## Referências
 
-- Helin, E., & Renberg, A. **The Little Book About OS Development**. Disponível em: [https://littleosbook.github.io/](https://littleosbook.github.io/)
-- [OSDev Wiki](https://wiki.osdev.org/) - Recursos sobre desenvolvimento de sistemas operacionais
+- Helin, E., & Renberg, A. **The Little Book About OS Development** — [littleosbook.github.io](https://littleosbook.github.io/)
+- [OSDev Wiki](https://wiki.osdev.org/)
 - [Intel® 64 and IA-32 Architectures Software Developer Manuals](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html)
 
 ## Contribuidores
@@ -71,36 +91,24 @@ Além do código fonte, a pasta `docs/` contém documentos em Markdown com:
         <img src="https://github.com/JoaoBoscoDuarte.png" width="100"/><br>
         <b>João Bosco Duarte</b>
       </a>
-      <p>
-      -
-      </p>
     </td>
     <td align="center">
       <a href="https://github.com/guilopeszw">
         <img src="https://github.com/guilopeszw.png" width="100"/><br>
         <b>Guilherme Lopes</b>
       </a>
-      <p>
-      - 
-      </p>
     </td>
     <td align="center">
       <a href="https://github.com/Marcus-Vin">
         <img src="https://github.com/Marcus-Vin.png" width="100"/><br>
         <b>Marcus Vinícius</b>
       </a>
-      <p>
-        -
-      </p>
     </td>
     <td align="center">
       <a href="https://github.com/SamSantosidc">
         <img src="https://github.com/SamSantosidc.png" width="100"/><br>
         <b>Samuel Santos</b>
       </a>
-      <p>
-      -
-      </p>
     </td>
   </tr>
 </table>

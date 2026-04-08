@@ -4,9 +4,8 @@ build/
 *.o
 *.iso
 
-# Bochs logs
-bochslog.txt
-com1.out
+# Logs de runtime
+logs/
 
 # IDE
 .vscode/
@@ -15,3 +14,4 @@ com1.out
 # Temporários
 *~
 *.swp
+*.DS_Store
